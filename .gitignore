@@ -216,3 +216,21 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Device / Wi-Fi credentials
+wifi-credentials.json
+wifi_credentials.json
+credentials.json
+secrets.json
+config.local.json
+
+# MicroPython / Pico local tooling
+.micropico/
+.pymakr.conf
+.pymakr/
+
+# Local device files / generated firmware
+*.uf2
+
+# Serial / device logs
+*.log
