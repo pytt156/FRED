@@ -29,8 +29,9 @@ while True:
         "timestamp": time.time(),
         "source": "simulated",
         "data": {
+            "connected": random.choice([True, True, True, False]),
             "rssi": random.randint(-75, -45),
-            "latency_ms": random.randint(15, 80),
+            "latency_ms": random.randint(15, 180),
         },
     }
 
