@@ -1,6 +1,7 @@
 import json
-
 import paho.mqtt.client as mqtt
+
+from backend.room_state import evaluate_room_state
 
 
 def on_message(client, userdata, message):
@@ -8,6 +9,14 @@ def on_message(client, userdata, message):
     data = json.loads(payload)
 
     print(message.topic, data)
+
+    if message.topic == "fred/room/metrics":
+        temperature = float(data["data"]["temperature"])
+        humidity = float(data["data"]["humidity"])
+
+        room_state = evaluate_room_state(temperature, humidity)
+
+        print(f"room state: {room_state}")
 
 
 if __name__ == "__main__":
