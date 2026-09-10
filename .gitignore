@@ -234,3 +234,7 @@ config.local.json
 
 # Serial / device logs
 *.log
+
+.micropico
+.vscode
+.DS_Store
