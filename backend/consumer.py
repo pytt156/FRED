@@ -1,7 +1,14 @@
 import json
-import paho.mqtt.client as mqtt
 
-from backend.room_state import evaluate_room_state
+import paho.mqtt.client as mqtt
+from room_state import evaluate_room_state
+
+latest_room_data = {
+    "temperature": None,
+    "humidity": None,
+    "light": None,
+    "noise": None,
+}
 
 
 def on_message(client, userdata, message):
@@ -11,12 +18,23 @@ def on_message(client, userdata, message):
     print(message.topic, data)
 
     if message.topic == "fred/room/metrics":
-        temperature = float(data["data"]["temperature"])
-        humidity = float(data["data"]["humidity"])
+        latest_room_data["temperature"] = data["data"].get("temperature")
+        latest_room_data["humidity"] = data["data"].get("humidity")
 
-        room_state = evaluate_room_state(temperature, humidity)
+    elif message.topic == "fred/room/light":
+        latest_room_data["light"] = data["data"].get("light")
 
-        print(f"room state: {room_state}")
+    elif message.topic == "fred/room/noise":
+        latest_room_data["noise"] = data["data"].get("noise")
+
+    room_state = evaluate_room_state(
+        temperature=latest_room_data["temperature"],
+        humidity=latest_room_data["humidity"],
+        light=latest_room_data["light"],
+        noise=latest_room_data["noise"],
+    )
+
+    print(f"room state: {room_state}")
 
 
 if __name__ == "__main__":
