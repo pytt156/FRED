@@ -1,7 +1,7 @@
 from wifi import connect_wifi
 from machine import Pin
-from dht import DHT11
 import time
+from dht11 import read_dht11
 
 time.sleep(.5)
 
@@ -11,3 +11,6 @@ led.value(0)
 if connect_wifi():
     led.value(1)
 
+while True:
+    dht_data = read_dht11()
+    time.sleep(1)
