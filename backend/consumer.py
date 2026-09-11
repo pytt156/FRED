@@ -1,6 +1,7 @@
 import json
 
 import paho.mqtt.client as mqtt
+from fred_state import evaluate_fred_state, get_display_state
 from network_state import evaluate_network_state
 from room_state import evaluate_room_state
 
@@ -57,7 +58,12 @@ def on_message(client, userdata, message):
     else:
         room_state = room_conditions + network_conditions
 
+    fred_states = evaluate_fred_state(room_state)
+    display_state = get_display_state(fred_states)
+
     print(f"room state: {room_state}")
+    print(f"fred states: {fred_states}")
+    print(f"display_state {display_state}")
 
 
 if __name__ == "__main__":
