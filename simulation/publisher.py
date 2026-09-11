@@ -1,8 +1,8 @@
 import json
-import random
 import time
 
 import paho.mqtt.client as mqtt
+from scenarios import SCENARIOS, random_scenario
 
 BROKER_HOST = "localhost"
 BROKER_PORT = 1883
@@ -12,16 +12,24 @@ NETWORK_STATUS_TOPIC = "fred/network/status"
 LIGHT_TOPIC = "fred/room/light"
 NOISE_TOPIC = "fred/room/noise"
 
+SCENARIO = "dark"
+
 client = mqtt.Client()
 client.connect(BROKER_HOST, BROKER_PORT)
 
+
 while True:
+    if SCENARIO == "random":
+        scenario = random_scenario()
+    else:
+        scenario = SCENARIOS[SCENARIO]
+
     room_data = {
         "timestamp": time.time(),
         "source": "simulated",
         "data": {
-            "temperature": round(random.uniform(20.0, 26.0), 1),
-            "humidity": round(random.uniform(35.0, 55.0), 1),
+            "temperature": scenario["temperature"],
+            "humidity": scenario["humidity"],
         },
     }
 
@@ -29,9 +37,9 @@ while True:
         "timestamp": time.time(),
         "source": "simulated",
         "data": {
-            "connected": random.choice([True, True, True, False]),
-            "rssi": random.randint(-75, -45),
-            "latency_ms": random.randint(15, 180),
+            "connected": scenario["connected"],
+            "rssi": scenario["rssi"],
+            "latency_ms": scenario["latency_ms"],
         },
     }
 
@@ -39,7 +47,7 @@ while True:
         "timestamp": time.time(),
         "source": "simulated",
         "data": {
-            "light": random.randint(0, 65535),
+            "light": scenario["light"],
         },
     }
 
@@ -47,7 +55,7 @@ while True:
         "timestamp": time.time(),
         "source": "simulated",
         "data": {
-            "noise": random.randint(0, 100),
+            "noise": scenario["noise"],
         },
     }
 
