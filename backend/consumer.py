@@ -18,8 +18,14 @@ latest_network_data = {
     "latency_ms": None,
 }
 
+last_room_state = None
+last_fred_states = None
+last_display_state = None
+
 
 def on_message(client, userdata, message):
+    global last_room_state, last_fred_states, last_display_state
+
     payload = message.payload.decode()
     data = json.loads(payload)
 
@@ -61,9 +67,17 @@ def on_message(client, userdata, message):
     fred_states = evaluate_fred_state(room_state)
     display_state = get_display_state(fred_states)
 
-    print(f"room state: {room_state}")
-    print(f"fred states: {fred_states}")
-    print(f"display_state {display_state}")
+    if room_state != last_room_state:
+        print(f"room state changed: {room_state}")
+        last_room_state = room_state
+
+    if fred_states != last_fred_states:
+        print(f"fred states changed: {fred_states}")
+        last_fred_states = fred_states
+
+    if display_state != last_display_state:
+        print(f"display state changed: {display_state}")
+        last_display_state = display_state
 
 
 if __name__ == "__main__":
