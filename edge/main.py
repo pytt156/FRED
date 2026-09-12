@@ -4,6 +4,7 @@ import time
 from dht11 import read_dht11
 from light_sensor import read_light
 from motion_sensor import read_motion
+from network_metrics import read_network_metrics
 
 time.sleep(.5)
 
@@ -17,5 +18,6 @@ while True:
     dht_data = read_dht11()
     light_data = read_light()
     motion_data = read_motion()
-
+    network_data = read_network_metrics()
+    
     time.sleep(1)
