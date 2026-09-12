@@ -12,4 +12,3 @@ def read_dht11():
     dht_data = {"temperature": temp, "humidity": humidity}
     print(dht_data)
     return dht_data
-
