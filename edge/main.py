@@ -6,6 +6,7 @@ from light_sensor import read_light
 from motion_sensor import read_motion
 from network_metrics import read_network_metrics
 from display import show_status
+from button import read_button
 
 time.sleep(.5)
 
@@ -28,5 +29,6 @@ while True:
         network_data["connected"],
         network_data["rssi"]
     )    
-
+    button_data = read_button()
+    
     time.sleep(1)
