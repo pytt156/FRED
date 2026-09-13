@@ -10,15 +10,20 @@ from display import show_status
 from button import read_button
 from speaker import play_tone
 
+from mqtt_client import connect_mqtt, publish_room_metrics, publish_light, publish_motion, publish_network_status
 
 time.sleep(.5)
 
 led = Pin(14, Pin.OUT)
 led.value(0)
 
-if connect_wifi():
-    led.value(1)
+wifi_connected = connect_wifi()
 
+mqtt_connected = False
+
+if wifi_connected:
+    led.value(1)
+    mqtt_connected = connect_mqtt()
 
 last_button_pressed = False
 
@@ -52,5 +57,12 @@ while True:
         network_data["connected"],
         network_data["rssi"]
     )
+
+
+    if mqtt_connected:
+        publish_room_metrics(dht_data["temperature"], dht_data["humidity"])
+        publish_light(light_data["light"])
+        publish_motion(motion_data["motion"])
+        publish_network_status(network_data["connected"], network_data["rssi"])
 
     time.sleep(1)
