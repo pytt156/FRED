@@ -8,7 +8,7 @@ SCENARIOS = {
         "noise": 30,
         "connected": True,
         "rssi": -55,
-        "latency_ms": 50,
+        "motion": True,
     },
     "hot": {
         "temperature": 29.0,
@@ -17,7 +17,7 @@ SCENARIOS = {
         "noise": 30,
         "connected": True,
         "rssi": -55,
-        "latency_ms": 50,
+        "motion": True,
     },
     "dark": {
         "temperature": 22.0,
@@ -26,7 +26,7 @@ SCENARIOS = {
         "noise": 30,
         "connected": True,
         "rssi": -55,
-        "latency_ms": 50,
+        "motion": True,
     },
     "noisy": {
         "temperature": 22.0,
@@ -35,7 +35,7 @@ SCENARIOS = {
         "noise": 90,
         "connected": True,
         "rssi": -55,
-        "latency_ms": 50,
+        "motion": True,
     },
     "bad_network": {
         "temperature": 22.0,
@@ -44,7 +44,7 @@ SCENARIOS = {
         "noise": 30,
         "connected": True,
         "rssi": -75,
-        "latency_ms": 180,
+        "motion": True,
     },
     "offline": {
         "temperature": 22.0,
@@ -53,7 +53,7 @@ SCENARIOS = {
         "noise": 30,
         "connected": False,
         "rssi": -55,
-        "latency_ms": 50,
+        "motion": True,
     },
 }
 
@@ -64,7 +64,7 @@ def random_scenario():
         "humidity": round(random.uniform(35.0, 55.0), 1),
         "light": random.randint(0, 65535),
         "noise": random.randint(0, 100),
+        "motion": random.choice([True, True, True, False, False, True]),
         "connected": random.choice([True, True, True, False]),
         "rssi": random.randint(-75, -45),
-        "latency_ms": random.randint(15, 180),
     }
