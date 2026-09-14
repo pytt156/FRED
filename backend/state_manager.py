@@ -1,5 +1,6 @@
 from fred_state import evaluate_fred_state, get_display_state
 from interaction import should_react
+from llm_client import generate_fred_response
 from network_state import evaluate_network_state
 from presence import is_presence_active, update_motion
 from publisher import publish_fred_state, publish_room_state
@@ -26,6 +27,18 @@ last_display_state = None
 def handle_message(client, topic, data):
     global last_room_state, last_fred_states, last_display_state
 
+    if topic == "fred/interaction/button":
+        fred_response = generate_fred_response(
+            room_state=last_room_state or ["UNKNOWN"],
+            fred_state=last_fred_states or [],
+            display_state=last_display_state or "UNKNOWN",
+            presence_active=True,
+            trigger="button",
+        )
+
+        print({fred_response})
+        return
+
     if topic == "fred/room/metrics":
         latest_room_data["temperature"] = data["data"].get("temperature")
         latest_room_data["humidity"] = data["data"].get("humidity")
@@ -38,7 +51,7 @@ def handle_message(client, topic, data):
 
     elif topic == "fred/room/motion":
         motion = data["data"].get("motion")
-        latest_room_data["motion"] = data["data"].get("motion")
+        latest_room_data["motion"] = motion
         update_motion(motion)
 
     elif topic == "fred/network/status":
@@ -68,11 +81,24 @@ def handle_message(client, topic, data):
     fred_changed = fred_states != last_fred_states
     display_changed = display_state != last_display_state
 
+    presence_active = is_presence_active()
+
     react = should_react(
-        presence_active=is_presence_active(), state_changed=fred_changed
+        presence_active=presence_active,
+        state_changed=fred_changed,
+        fred_states=fred_states,
     )
+
     if react:
-        print("FRED should react")
+        fred_response = generate_fred_response(
+            room_state=room_state,
+            fred_state=fred_states,
+            display_state=display_state,
+            presence_active=presence_active,
+            trigger="spontaneous",
+        )
+
+        print(f"FRED says: {fred_response}")
 
     if room_state != last_room_state:
         print(f"room state changed: {room_state}")
