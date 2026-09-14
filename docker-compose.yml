@@ -1,6 +1,6 @@
 services:
   mosquitto:
-    container_name: mosquitto
+    container_name: fred-mosquitto
     image: eclipse-mosquitto
     ports:
       - "1883:1883"
@@ -18,5 +18,19 @@ services:
       - timescaledb_data:/var/lib/postgresql/data
       - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
 
+  grafana:
+    container_name: fred-grafana
+    image: grafana/grafana:latest
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - timescaledb
+
 volumes:
   timescaledb_data:
+  grafana_data:
