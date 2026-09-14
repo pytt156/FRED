@@ -7,13 +7,13 @@ latest_room_data = {
     "temperature": None,
     "humidity": None,
     "light": None,
+    "motion": None,
     "noise": None,
 }
 
 latest_network_data = {
     "connected": None,
     "rssi": None,
-    "latency_ms": None,
 }
 
 last_room_state = None
@@ -34,10 +34,12 @@ def handle_message(client, topic, data):
     elif topic == "fred/room/noise":
         latest_room_data["noise"] = data["data"].get("noise")
 
+    elif topic == "fred/room/motion":
+        latest_room_data["motion"] = data["data"].get("motion")
+
     elif topic == "fred/network/status":
         latest_network_data["connected"] = data["data"].get("connected")
         latest_network_data["rssi"] = data["data"].get("rssi")
-        latest_network_data["latency_ms"] = data["data"].get("latency_ms")
 
     room_conditions = evaluate_room_state(
         temperature=latest_room_data["temperature"],
@@ -49,7 +51,6 @@ def handle_message(client, topic, data):
     network_conditions = evaluate_network_state(
         connected=latest_network_data["connected"],
         rssi=latest_network_data["rssi"],
-        latency_ms=latest_network_data["latency_ms"],
     )
 
     if "OFFLINE" in network_conditions:

@@ -18,6 +18,7 @@ if __name__ == "__main__":
     client.subscribe("fred/room/metrics")
     client.subscribe("fred/room/light")
     client.subscribe("fred/room/noise")
+    client.subscribe("fred/room/motion")
     client.subscribe("fred/network/status")
 
     client.on_message = on_message

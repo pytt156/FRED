@@ -11,8 +11,9 @@ ROOM_METRICS_TOPIC = "fred/room/metrics"
 NETWORK_STATUS_TOPIC = "fred/network/status"
 LIGHT_TOPIC = "fred/room/light"
 NOISE_TOPIC = "fred/room/noise"
+MOTION_TOPIC = "fred/room/motion"
 
-SCENARIO = "dark"
+SCENARIO = "random"
 
 client = mqtt.Client()
 client.connect(BROKER_HOST, BROKER_PORT)
@@ -39,7 +40,6 @@ while True:
         "data": {
             "connected": scenario["connected"],
             "rssi": scenario["rssi"],
-            "latency_ms": scenario["latency_ms"],
         },
     }
 
@@ -59,12 +59,21 @@ while True:
         },
     }
 
+    motion_data = {
+        "timestamp": time.time(),
+        "source": "simulated",
+        "data": {
+            "motion": scenario["motion"],
+        },
+    }
+
     client.publish(ROOM_METRICS_TOPIC, json.dumps(room_data))
     client.publish(NETWORK_STATUS_TOPIC, json.dumps(network_data))
     client.publish(LIGHT_TOPIC, json.dumps(light_data))
     client.publish(NOISE_TOPIC, json.dumps(noise_data))
+    client.publish(MOTION_TOPIC, json.dumps(motion_data))
 
-    print(f"sent room metrics: {room_data}, {light_data}, {noise_data}")
+    print(f"sent room metrics: {room_data}, {light_data}, {noise_data}, {motion_data}")
     print(f"sent network status: {network_data}")
 
     time.sleep(3)
