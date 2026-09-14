@@ -6,11 +6,17 @@ from dht11 import read_dht11
 from light_sensor import read_light
 from motion_sensor import read_motion
 from network_metrics import read_network_metrics
-from display import show_status
+from display import show_fred_face, show_room_status, show_network_status
 from button import read_button
 from speaker import play_tone
 
 from mqtt_client import connect_mqtt, publish_room_metrics, publish_light, publish_motion, publish_network_status
+
+SCREEN_FRED = 0
+SCREEN_ROOM = 1
+SCREEN_NETWORK = 2
+
+current_screen = SCREEN_FRED    
 
 time.sleep(.5)
 
@@ -58,25 +64,37 @@ while True:
     light_data = read_light()
     motion_data = read_motion()
     button_data = read_button()
+
     button_pressed = button_data["pressed"]
 
     if button_pressed and not last_button_pressed:
-        play_tone(
-            frequency=700,
-            duration=0.1
-        )
+        current_screen += 1
+
+        if current_screen > SCREEN_NETWORK:
+            current_screen = SCREEN_FRED
+
+        play_tone(frequency=700, duration=0.1)
+
 
     last_button_pressed = button_pressed
 
-    show_status(
-        dht_data["temperature"],
-        dht_data["humidity"],
-        light_data["light"],
-        motion_data["motion"],
-        network_data["connected"],
-        network_data["rssi"]
-    )
+    if current_screen == SCREEN_FRED:
+        show_fred_face("happy")
 
+    elif current_screen == SCREEN_ROOM:
+        show_room_status(
+            dht_data["temperature"],
+            dht_data["humidity"],
+            light_data["light"],
+            motion_data["motion"],
+        )
+
+    elif current_screen == SCREEN_NETWORK:
+        show_network_status(
+            network_data["connected"],
+            network_data["rssi"],
+            mqtt_connected
+        )
 
     if mqtt_connected:
         metrics_published = publish_room_metrics(dht_data["temperature"], dht_data["humidity"])
