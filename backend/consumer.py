@@ -20,6 +20,7 @@ if __name__ == "__main__":
     client.subscribe("fred/room/noise")
     client.subscribe("fred/room/motion")
     client.subscribe("fred/network/status")
+    client.subscribe("fred/interaction/button")
 
     client.on_message = on_message
     client.loop_forever()

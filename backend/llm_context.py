@@ -14,8 +14,11 @@ room_state: {room_state}
 fred_state: {fred_state}
 display_state: {display_state}
 presence_active: {presence_active}
-trigger: {trigger}
-</current_state>
+<current_state>
+
+<event>
+type: {trigger}
+</event>
 """.strip()
 
 
