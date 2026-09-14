@@ -4,3 +4,19 @@ services:
     image: eclipse-mosquitto
     ports:
       - "1883:1883"
+
+  timescaledb:
+    container_name: fred-timescaledb
+    image: timescale/timescaledb:latest-pg17
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - timescaledb_data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+
+volumes:
+  timescaledb_data:
