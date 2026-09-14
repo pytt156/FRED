@@ -1,6 +1,7 @@
 from fred_state import evaluate_fred_state, get_display_state
+from interaction import should_react
 from network_state import evaluate_network_state
-from presence import update_motion
+from presence import is_presence_active, update_motion
 from publisher import publish_fred_state, publish_room_state
 from room_state import evaluate_room_state
 
@@ -66,6 +67,12 @@ def handle_message(client, topic, data):
 
     fred_changed = fred_states != last_fred_states
     display_changed = display_state != last_display_state
+
+    react = should_react(
+        presence_active=is_presence_active(), state_changed=fred_changed
+    )
+    if react:
+        print("FRED should react")
 
     if room_state != last_room_state:
         print(f"room state changed: {room_state}")
