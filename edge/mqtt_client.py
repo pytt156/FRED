@@ -10,6 +10,7 @@ ROOM_METRICS_TOPIC = b"fred/room/metrics"
 LIGHT_TOPIC = b"fred/room/light"
 MOTION_TOPIC = b"fred/room/motion"
 NETWORK_STATUS_TOPIC = b"fred/network/status"
+INTERACTION_BUTTON_TOPIC = b"fred/interaction/button"
 
 client = None
 
@@ -25,6 +26,15 @@ def connect_mqtt():
         print("MQTT connection failed:", error)
         return False
 
+
+def publish_interaction_button():
+    payload = {
+        "timestamp": time.time(),
+        "source": "real",
+        "data": {"pressed": True}
+    }
+
+    return publish_json(INTERACTION_BUTTON_TOPIC, payload)
 
 def publish_json(topic, data):
     try: 
