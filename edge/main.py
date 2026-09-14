@@ -29,16 +29,35 @@ last_button_pressed = False
 
 
 while True:
-    dht_data = read_dht11()
-
-    light_data = read_light()
-
-    motion_data = read_motion()
-
     network_data = read_network_metrics()
 
-    button_data = read_button()
+    if not network_data["connected"]:
+        print("Wifi disconnected")
 
+        led.value(0)
+        mqtt_connected = False
+
+        print("Attempting wifi reconnect..")
+
+        wifi_connected = connect_wifi()
+
+        if wifi_connected:
+            print("Wifi reconnected")
+
+            led.value(1)
+            network_data = read_network_metrics()
+    else: 
+        led.value(1)
+
+    if network_data["connected"] and not mqtt_connected:
+        print("Attempting MQTT reconnect..")
+
+        mqtt_connected = connect_mqtt()
+
+    dht_data = read_dht11()
+    light_data = read_light()
+    motion_data = read_motion()
+    button_data = read_button()
     button_pressed = button_data["pressed"]
 
     if button_pressed and not last_button_pressed:
@@ -60,9 +79,14 @@ while True:
 
 
     if mqtt_connected:
-        publish_room_metrics(dht_data["temperature"], dht_data["humidity"])
-        publish_light(light_data["light"])
-        publish_motion(motion_data["motion"])
-        publish_network_status(network_data["connected"], network_data["rssi"])
+        metrics_published = publish_room_metrics(dht_data["temperature"], dht_data["humidity"])
+        light_published = publish_light(light_data["light"])
+        motion_published = publish_motion(motion_data["motion"])
+        network_published = publish_network_status(network_data["connected"], network_data["rssi"])
 
+
+        if not (metrics_published and light_published and motion_published and network_published):
+            print("MQTT connection lost")
+            mqtt_connected = False
+        
     time.sleep(1)

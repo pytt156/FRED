@@ -11,10 +11,13 @@ LIGHT_TOPIC = b"fred/room/light"
 MOTION_TOPIC = b"fred/room/motion"
 NETWORK_STATUS_TOPIC = b"fred/network/status"
 
-client = MQTTClient(CLIENT_ID, BROKER_IP, port=BROKER_PORT)
+client = None
 
 def connect_mqtt():
+    global client
+
     try:
+        client = MQTTClient(CLIENT_ID, BROKER_IP, port=BROKER_PORT)
         client.connect()
         print("MQTT connected")
         return True
