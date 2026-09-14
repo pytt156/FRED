@@ -1,5 +1,6 @@
 from fred_state import evaluate_fred_state, get_display_state
 from network_state import evaluate_network_state
+from presence import update_motion
 from publisher import publish_fred_state, publish_room_state
 from room_state import evaluate_room_state
 
@@ -35,7 +36,9 @@ def handle_message(client, topic, data):
         latest_room_data["noise"] = data["data"].get("noise")
 
     elif topic == "fred/room/motion":
+        motion = data["data"].get("motion")
         latest_room_data["motion"] = data["data"].get("motion")
+        update_motion(motion)
 
     elif topic == "fred/network/status":
         latest_network_data["connected"] = data["data"].get("connected")
