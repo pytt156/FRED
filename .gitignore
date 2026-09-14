@@ -238,3 +238,5 @@ config.local.json
 .micropico
 .vscode
 .DS_Store
+
+.wav

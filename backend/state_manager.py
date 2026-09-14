@@ -5,6 +5,7 @@ from network_state import evaluate_network_state
 from presence import is_presence_active, update_motion
 from publisher import publish_fred_state, publish_room_state
 from room_state import evaluate_room_state
+from tts_client import generate_speech
 
 latest_room_data = {
     "temperature": None,
@@ -36,7 +37,8 @@ def handle_message(client, topic, data):
             trigger="button",
         )
 
-        print({fred_response})
+        print(f"FRED says: {fred_response}")
+        generate_speech(fred_response)
         return
 
     if topic == "fred/room/metrics":
@@ -99,6 +101,7 @@ def handle_message(client, topic, data):
         )
 
         print(f"FRED says: {fred_response}")
+        generate_speech(fred_response)
 
     if room_state != last_room_state:
         print(f"room state changed: {room_state}")
