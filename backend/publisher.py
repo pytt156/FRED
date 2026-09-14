@@ -24,4 +24,4 @@ def publish_fred_state(client, fred_states, display_state):
         },
     }
 
-    client.publish("fred/state/fred", json.dumps(payload))
+    client.publish("fred/state/fred", json.dumps(payload), retain=True)
