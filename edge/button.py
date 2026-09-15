@@ -9,12 +9,6 @@ button = Pin(
 
 
 def read_button():
-    pressed = button.value() == 0
-
-    button_data = {
-        "pressed": pressed
+    return {
+        "pressed": button.value() == 0
     }
-
-    print(button_data)
-
-    return button_data
