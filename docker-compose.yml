@@ -31,6 +31,26 @@ services:
     depends_on:
       - timescaledb
 
+  consumer:
+    container_name: fred-consumer
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      - MQTT_HOST=mosquitto
+      - MQTT_PORT=1883
+      - LLM_PROVIDER=${LLM_PROVIDER}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - OPENROUTER_MODEL=${OPENROUTER_MODEL}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_MODEL=${OPENAI_MODEL}
+      - OPENAI_TTS_MODEL=${OPENAI_TTS_MODEL}
+      - OPENAI_TTS_VOICE=${OPENAI_TTS_VOICE}
+    depends_on:
+      - mosquitto
+      - timescaledb
+    restart: unless-stopped
+
 volumes:
   timescaledb_data:
   grafana_data:
