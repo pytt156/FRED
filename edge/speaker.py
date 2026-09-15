@@ -1,14 +1,21 @@
-from machine import Pin, I2S
 from array import array
 import math
 import time
 
+from machine import I2S, Pin
 
-SAMPLE_RATE = 16000
+
+TONE_SAMPLE_RATE = 16000
+
+audio = None
 
 
-def play_tone(frequency=440, duration=0.2, amplitude=5000):
-    audio = I2S(
+def play_tone(
+    frequency=440,
+    duration=0.2,
+    amplitude=5000,
+):
+    tone_audio = I2S(
         0,
         sck=Pin(10),
         ws=Pin(11),
@@ -16,32 +23,56 @@ def play_tone(frequency=440, duration=0.2, amplitude=5000):
         mode=I2S.TX,
         bits=16,
         format=I2S.STEREO,
-        rate=SAMPLE_RATE,
-        ibuf=20000
+        rate=TONE_SAMPLE_RATE,
+        ibuf=20000,
     )
 
     samples = array("h")
 
-    number_of_samples = int(
-        SAMPLE_RATE * duration
-    )
+    number_of_samples = int(TONE_SAMPLE_RATE * duration)
 
     for i in range(number_of_samples):
         sample = int(
-            amplitude *
-            math.sin(
-                2 * math.pi *
-                frequency *
-                i /
-                SAMPLE_RATE
-            )
+            amplitude * math.sin(2 * math.pi * frequency * i / TONE_SAMPLE_RATE)
         )
 
         samples.append(sample)
         samples.append(sample)
 
-    audio.write(samples)
+    tone_audio.write(samples)
 
     time.sleep(duration)
 
-    audio.deinit()
+    tone_audio.deinit()
+
+
+def start_audio(sample_rate=24000):
+    global audio
+
+    if audio is not None:
+        audio.deinit()
+
+    audio = I2S(
+        0,
+        sck=Pin(10),
+        ws=Pin(11),
+        sd=Pin(9),
+        mode=I2S.TX,
+        bits=16,
+        format=I2S.MONO,
+        rate=sample_rate,
+        ibuf=20000,
+    )
+
+
+def write_audio_chunk(data):
+    if audio is not None:
+        audio.write(data)
+
+
+def stop_audio():
+    global audio
+
+    if audio is not None:
+        audio.deinit()
+        audio = None

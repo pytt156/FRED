@@ -1,3 +1,4 @@
+from audio_publisher import publish_audio
 from datetime import datetime, timezone
 from fred_state import evaluate_fred_state, get_display_state
 from interaction import should_react
@@ -40,7 +41,10 @@ def handle_message(client, topic, data):
         )
 
         print(f"FRED says: {fred_response}")
-        generate_speech(fred_response)
+
+        audio_bytes = generate_speech(fred_response)
+        publish_audio(client, audio_bytes)
+
         return
 
     if topic == "fred/room/metrics":
@@ -114,7 +118,8 @@ def handle_message(client, topic, data):
         )
 
         print(f"FRED says: {fred_response}")
-        generate_speech(fred_response)
+        audio_bytes = generate_speech(fred_response)
+        publish_audio(client, audio_bytes)
 
     if room_state != last_room_state:
         print(f"room state changed: {room_state}")
