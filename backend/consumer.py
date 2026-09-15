@@ -1,8 +1,13 @@
 import json
+import os
 
 import paho.mqtt.client as mqtt
+
 from state_manager import handle_message
 
+
+MQTT_HOST = os.getenv("MQTT_HOST", "localhost")
+MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
 
 def on_message(client, userdata, message):
     payload = message.payload.decode()
@@ -13,7 +18,7 @@ def on_message(client, userdata, message):
 
 if __name__ == "__main__":
     client = mqtt.Client()
-    client.connect("localhost", 1883)
+    client.connect(MQTT_HOST, MQTT_PORT)
 
     client.subscribe("fred/room/metrics")
     client.subscribe("fred/room/light")
@@ -23,4 +28,5 @@ if __name__ == "__main__":
     client.subscribe("fred/interaction/button")
 
     client.on_message = on_message
+    print("FRED consumer connected to MQTT broker:",MQTT_HOST,MQTT_PORT,)
     client.loop_forever()

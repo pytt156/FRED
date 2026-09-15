@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from fred_state import evaluate_fred_state, get_display_state
 from interaction import should_react
 from llm_client import generate_fred_response
@@ -6,6 +7,7 @@ from presence import is_presence_active, update_motion
 from publisher import publish_fred_state, publish_room_state
 from room_state import evaluate_room_state
 from tts_client import generate_speech
+from persistence import save_telemetry
 
 latest_room_data = {
     "temperature": None,
@@ -59,6 +61,17 @@ def handle_message(client, topic, data):
     elif topic == "fred/network/status":
         latest_network_data["connected"] = data["data"].get("connected")
         latest_network_data["rssi"] = data["data"].get("rssi")
+        save_telemetry(
+            time=datetime.now(timezone.utc),
+            device_id="fred-pico-01",
+            source=data.get("source", "real"),
+            temperature=latest_room_data["temperature"],
+            humidity=latest_room_data["humidity"],
+            light=latest_room_data["light"],
+            motion=latest_room_data["motion"],
+            wifi_connected=latest_network_data["connected"],
+            rssi=latest_network_data["rssi"],
+        )
 
     room_conditions = evaluate_room_state(
         temperature=latest_room_data["temperature"],
