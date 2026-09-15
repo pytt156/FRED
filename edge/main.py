@@ -9,6 +9,7 @@ from network_metrics import read_network_metrics
 from display import show_fred_face, show_room_status, show_network_status
 from button import read_button
 from speaker import play_tone
+from interaction_button import read_interaction_button
 
 from mqtt_client import (
     connect_mqtt,
@@ -40,6 +41,7 @@ if wifi_connected:
     mqtt_connected = connect_mqtt()
 
 last_button_pressed = False
+last_interaction_button_pressed = False
 
 
 while True:
@@ -89,6 +91,18 @@ while True:
 
     last_button_pressed = button_pressed
 
+    interaction_button_data = read_interaction_button()
+    interaction_button_pressed = interaction_button_data["pressed"]
+
+    if (
+        interaction_button_pressed
+        and not last_interaction_button_pressed
+        and mqtt_connected
+    ):
+        publish_interaction_button()
+
+    last_interaction_button_pressed = interaction_button_pressed
+    
     if current_screen == SCREEN_FRED:
         fred_state = get_fred_display_state()
 
