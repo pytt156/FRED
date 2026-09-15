@@ -21,8 +21,11 @@ def connect_wifi(waiting_time=10):
     print(f"{wlan.ifconfig()}")
 
     while waiting_time > 0:
+        print("WiFi status:", wlan.status())
+
         if wlan.isconnected():
             print("Connected to wifi")
+            print("Network config:", wlan.ifconfig())
             break
 
         waiting_time -= 1

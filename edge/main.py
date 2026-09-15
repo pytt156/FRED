@@ -18,7 +18,8 @@ from mqtt_client import (
     publish_room_metrics,
     publish_light,
     publish_motion,
-    publish_network_status
+    publish_network_status,
+    publish_interaction_button
 )
 
 SCREEN_FRED = 0
