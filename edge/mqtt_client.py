@@ -1,4 +1,5 @@
 from simple import MQTTClient
+from speaker import start_audio, write_audio_chunk, stop_audio
 import json
 import time
 
@@ -11,17 +12,41 @@ LIGHT_TOPIC = b"fred/room/light"
 MOTION_TOPIC = b"fred/room/motion"
 NETWORK_STATUS_TOPIC = b"fred/network/status"
 INTERACTION_BUTTON_TOPIC = b"fred/interaction/button"
+AUDIO_START_TOPIC = b"fred/audio/start"
+AUDIO_CHUNK_TOPIC = b"fred/audio/chunk"
+AUDIO_END_TOPIC = b"fred/audio/end"
 
 FRED_STATE_TOPIC = b"fred/state/fred"
 
 client = None
 fred_display_state = "HAPPY"
+audio_receiving = False
 
 
 def on_mqtt_message(topic, message):
-    global fred_display_state
+    global fred_display_state, audio_receiving
 
-    try: 
+    if topic == AUDIO_START_TOPIC:
+        metadata = json.loads(message.decode())
+
+        print("Audio start:", metadata)
+
+        start_audio(metadata["sample_rate"])
+        audio_receiving = True
+        return
+
+    if topic == AUDIO_CHUNK_TOPIC:
+        write_audio_chunk(message)
+        return
+
+    if topic == AUDIO_END_TOPIC:
+        print("Audio end")
+
+        stop_audio()
+        audio_receiving = False
+        return
+
+    try:
         data = json.loads(message.decode())
         print("MQTT received:", topic, data)
 
@@ -34,6 +59,7 @@ def on_mqtt_message(topic, message):
     except Exception as error:
         print("MQTT message error:", error)
 
+
 def connect_mqtt():
     global client
 
@@ -42,6 +68,9 @@ def connect_mqtt():
         client.set_callback(on_mqtt_message)
         client.connect()
         client.subscribe(FRED_STATE_TOPIC)
+        client.subscribe(AUDIO_START_TOPIC)
+        client.subscribe(AUDIO_CHUNK_TOPIC)
+        client.subscribe(AUDIO_END_TOPIC)
 
         print("MQTT connected")
         print("Subscribed to:", FRED_STATE_TOPIC)
@@ -52,28 +81,52 @@ def connect_mqtt():
         print("MQTT connection failed:", error)
         return False
 
+
 def check_mqtt_messages():
+    global audio_receiving
+
     try:
         client.check_msg()
+
+        if audio_receiving:
+            started_at = time.ticks_ms()
+            timeout_ms = 15000
+
+            while audio_receiving:
+                client.check_msg()
+
+                if time.ticks_diff(time.ticks_ms(), started_at) > timeout_ms:
+                    print("Audio receive timed out")
+                    stop_audio()
+                    audio_receiving = False
+                    break
+
+                time.sleep_ms(1)
+
         return True
+
     except Exception as error:
         print("MQTT receive failed:", error)
+
+        if audio_receiving:
+            stop_audio()
+            audio_receiving = False
+
         return False
+
 
 def get_fred_display_state():
     return fred_display_state
 
+
 def publish_interaction_button():
-    payload = {
-        "timestamp": time.time(),
-        "source": "real",
-        "data": {"pressed": True}
-    }
+    payload = {"timestamp": time.time(), "source": "real", "data": {"pressed": True}}
 
     return publish_json(INTERACTION_BUTTON_TOPIC, payload)
 
+
 def publish_json(topic, data):
-    try: 
+    try:
         payload = json.dumps(data)
         client.publish(topic, payload.encode())
         print("MQTT published:", topic, payload)
@@ -88,35 +141,20 @@ def publish_room_metrics(temperature, humidity):
     payload = {
         "timestamp": time.time(),
         "source": "real",
-        "data": {
-            "temperature": temperature,
-            "humidity": humidity
-        }
+        "data": {"temperature": temperature, "humidity": humidity},
     }
 
     return publish_json(ROOM_METRICS_TOPIC, payload)
 
 
 def publish_light(light):
-    payload = {
-        "timestamp": time.time(),
-        "source": "real",
-        "data": {
-            "light": light
-        }
-    }
+    payload = {"timestamp": time.time(), "source": "real", "data": {"light": light}}
 
     return publish_json(LIGHT_TOPIC, payload)
 
 
 def publish_motion(motion):
-    payload = {
-        "timestamp": time.time(),
-        "source": "real",
-        "data": {
-            "motion": motion
-        }
-    }
+    payload = {"timestamp": time.time(), "source": "real", "data": {"motion": motion}}
 
     return publish_json(MOTION_TOPIC, payload)
 
@@ -125,11 +163,7 @@ def publish_network_status(connected, rssi):
     payload = {
         "timestamp": time.time(),
         "source": "real",
-        "data": {
-            "connected": connected,
-            "rssi": rssi
-        }
+        "data": {"connected": connected, "rssi": rssi},
     }
 
     return publish_json(NETWORK_STATUS_TOPIC, payload)
-
