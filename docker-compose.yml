@@ -5,7 +5,11 @@ services:
     ports:
       - "1883:1883"
     healthcheck:
-      test: ["CMD-SHELL", "mosquitto_sub -h localhost -p 1883 -t '$$SYS/broker/version' -C 1 -W 3 >/dev/null 2>&1"]
+      test:
+        [
+          "CMD-SHELL",
+          "mosquitto_sub -h localhost -p 1883 -t '$$SYS/broker/version' -C 1 -W 3 >/dev/null 2>&1",
+        ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -59,11 +63,11 @@ services:
       context: .
       dockerfile: backend/Dockerfile
     environment:
-      - MQTT_HOST=mosquitto
-      - MQTT_PORT=1883
+      - MQTT_HOST=${MQTT_HOST}
+      - MQTT_PORT=${MQTT_PORT}
 
-      - POSTGRES_HOST=timescaledb
-      - POSTGRES_PORT=5432
+      - POSTGRES_HOST=${POSTGRES_HOST}
+      - POSTGRES_PORT=${POSTGRES_PORT}
       - POSTGRES_DB=${POSTGRES_DB}
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
