@@ -1,0 +1,22 @@
+apiVersion: 1
+
+datasources:
+  - name: FRED TimescaleDB
+    uid: fred-timescaledb
+    type: postgres
+    access: proxy
+    url: timescaledb:5432
+
+    user: ${POSTGRES_USER}
+
+    secureJsonData:
+      password: ${POSTGRES_PASSWORD}
+
+    jsonData:
+      database: ${POSTGRES_DB}
+      sslmode: disable
+      postgresVersion: 1700
+      timescaledb: true
+
+    isDefault: true
+    editable: false
