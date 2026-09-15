@@ -10,7 +10,15 @@ from display import show_fred_face, show_room_status, show_network_status
 from button import read_button
 from speaker import play_tone
 
-from mqtt_client import connect_mqtt, publish_room_metrics, publish_light, publish_motion, publish_network_status
+from mqtt_client import (
+    connect_mqtt,
+    check_mqtt_messages,
+    get_fred_display_state,
+    publish_room_metrics,
+    publish_light,
+    publish_motion,
+    publish_network_status
+)
 
 SCREEN_FRED = 0
 SCREEN_ROOM = 1
@@ -60,6 +68,9 @@ while True:
 
         mqtt_connected = connect_mqtt()
 
+    if mqtt_connected:
+        mqtt_connected = check_mqtt_messages()
+
     dht_data = read_dht11()
     light_data = read_light()
     motion_data = read_motion()
@@ -79,7 +90,9 @@ while True:
     last_button_pressed = button_pressed
 
     if current_screen == SCREEN_FRED:
-        show_fred_face("happy")
+        fred_state = get_fred_display_state()
+
+        show_fred_face(fred_state.lower())
 
     elif current_screen == SCREEN_ROOM:
         show_room_status(
