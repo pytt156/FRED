@@ -68,10 +68,10 @@ while True:
     }
 
     client.publish(ROOM_METRICS_TOPIC, json.dumps(room_data))
-    client.publish(NETWORK_STATUS_TOPIC, json.dumps(network_data))
     client.publish(LIGHT_TOPIC, json.dumps(light_data))
     client.publish(NOISE_TOPIC, json.dumps(noise_data))
     client.publish(MOTION_TOPIC, json.dumps(motion_data))
+    client.publish(NETWORK_STATUS_TOPIC, json.dumps(network_data))
 
     print(f"sent room metrics: {room_data}, {light_data}, {noise_data}, {motion_data}")
     print(f"sent network status: {network_data}")
