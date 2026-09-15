@@ -239,4 +239,4 @@ config.local.json
 .vscode
 .DS_Store
 
-.wav
+*.wav
