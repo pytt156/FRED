@@ -1,0 +1,8 @@
+FROM eclipse-mosquitto:2
+
+COPY azure/mosquitto/mosquitto.conf /mosquitto/config/mosquitto.conf
+COPY --chmod=755 azure/mosquitto/entrypoint.sh /mosquitto/entrypoint.sh
+
+USER mosquitto
+
+ENTRYPOINT ["/mosquitto/entrypoint.sh"]
