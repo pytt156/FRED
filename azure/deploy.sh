@@ -20,11 +20,13 @@ MOSQUITTO_APP="fred-mosquitto"
 TIMESCALE_APP="fred-timescaledb"
 GRAFANA_APP="fred-grafana"
 CONSUMER_APP="fred-consumer"
+MLFLOW_APP="fred-mlflow"
 
 MOSQUITTO_IMAGE="ghcr.io/omeraytug/fred-mosquitto:demo"
 TIMESCALE_IMAGE="ghcr.io/omeraytug/fred-timescaledb:demo"
 GRAFANA_IMAGE="ghcr.io/omeraytug/fred-grafana:demo"
 CONSUMER_IMAGE="ghcr.io/omeraytug/fred-consumer:demo"
+MLFLOW_IMAGE="ghcr.io/mlflow/mlflow:v3.16.1"
 
 CERT_DIR="azure/certs"
 CA_KEY="${CERT_DIR}/fred-ca.key"
@@ -34,6 +36,8 @@ SERVER_KEY="${CERT_DIR}/mqtt-server.key"
 SERVER_CSR="${CERT_DIR}/mqtt-server.csr"
 SERVER_CERT="${CERT_DIR}/mqtt-server.crt"
 SERVER_EXT="${CERT_DIR}/mqtt-server.ext"
+
+MLFLOW_YAML="/tmp/fred-mlflow.yaml"
 
 # ============================================================
 # Cleanup
@@ -48,6 +52,8 @@ cleanup() {
     unset MQTT_CA_CERT_B64 || true
     unset MQTT_SERVER_CERT_B64 || true
     unset MQTT_SERVER_KEY_B64 || true
+
+    rm -f "$MLFLOW_YAML" || true
 }
 
 trap cleanup EXIT
@@ -69,6 +75,11 @@ fi
 
 if ! command -v openssl >/dev/null 2>&1; then
     echo "ERROR: OpenSSL is not installed."
+    exit 1
+fi
+
+if ! command -v python3 >/dev/null 2>&1; then
+    echo "ERROR: Python 3 is not installed."
     exit 1
 fi
 
@@ -384,6 +395,91 @@ az containerapp create \
     --output none
 
 # ============================================================
+# MLflow
+# ============================================================
+
+echo "Deploying MLflow..."
+
+az containerapp create \
+    --name "$MLFLOW_APP" \
+    --resource-group "$RESOURCE_GROUP" \
+    --environment "$ENVIRONMENT" \
+    --image "$MLFLOW_IMAGE" \
+    --cpu 1 \
+    --memory 2Gi \
+    --min-replicas 1 \
+    --max-replicas 1 \
+    --ingress internal \
+    --target-port 5000 \
+    --transport auto \
+    --output none
+
+MLFLOW_FQDN=$(
+    az containerapp show \
+        --name "$MLFLOW_APP" \
+        --resource-group "$RESOURCE_GROUP" \
+        --query properties.configuration.ingress.fqdn \
+        --output tsv
+)
+
+if [[ -z "$MLFLOW_FQDN" ]]; then
+    echo "ERROR: Could not determine MLflow internal FQDN."
+    exit 1
+fi
+
+echo "MLflow internal hostname: $MLFLOW_FQDN"
+
+echo "Configuring MLflow startup command..."
+
+az containerapp show \
+    --name "$MLFLOW_APP" \
+    --resource-group "$RESOURCE_GROUP" \
+    --output yaml \
+    > "$MLFLOW_YAML"
+
+MLFLOW_ALLOWED_HOSTS="${MLFLOW_APP},${MLFLOW_FQDN}"
+export MLFLOW_ALLOWED_HOSTS
+
+python3 - "$MLFLOW_YAML" <<'PY'
+from pathlib import Path
+import os
+import sys
+
+path = Path(sys.argv[1])
+text = path.read_text()
+
+image_marker = "    image: ghcr.io/mlflow/mlflow:v3.16.1"
+
+if image_marker not in text:
+    raise SystemExit("ERROR: Could not locate MLflow container in exported YAML.")
+
+command_block = f"""    command:
+      - /bin/sh
+    args:
+      - -c
+      - mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri sqlite:////mlflow/mlflow.db --artifacts-destination /mlflow/artifacts --allowed-hosts "{os.environ['MLFLOW_ALLOWED_HOSTS']}" --workers 1
+"""
+
+text = text.replace(
+    image_marker,
+    command_block + image_marker,
+    1,
+)
+
+path.write_text(text)
+PY
+
+az containerapp update \
+    --name "$MLFLOW_APP" \
+    --resource-group "$RESOURCE_GROUP" \
+    --yaml "$MLFLOW_YAML" \
+    --output none
+
+MLFLOW_TRACKING_URI="https://${MLFLOW_FQDN}"
+
+echo "MLflow tracking URI: $MLFLOW_TRACKING_URI"
+
+# ============================================================
 # Consumer
 # ============================================================
 
@@ -421,6 +517,7 @@ az containerapp create \
         OPENAI_MODEL=gpt-5.6-luna \
         OPENAI_TTS_MODEL=gpt-4o-mini-tts \
         OPENAI_TTS_VOICE=ash \
+        MLFLOW_TRACKING_URI="$MLFLOW_TRACKING_URI" \
     --output none
 
 # ============================================================
@@ -449,10 +546,13 @@ echo
 echo "MQTT TLS:"
 echo "Enabled"
 echo
+echo "MLflow:"
+echo "${MLFLOW_TRACKING_URI}"
+echo
 echo "Pico CA certificate:"
 echo "${CA_CERT}"
 echo
 echo "IMPORTANT:"
-echo "TimescaleDB storage is currently ephemeral."
-echo "Container replacement/recreation can destroy telemetry."
-echo
+echo "TimescaleDB and MLflow storage are currently ephemeral."
+echo "Container replacement/recreation can destroy telemetry,"
+echo "MLflow traces, registered prompts, and artifacts."

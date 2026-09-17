@@ -18,6 +18,7 @@ echo "  - Container Apps"
 echo "  - Container Apps environment"
 echo "  - VNet and subnet"
 echo "  - TimescaleDB container data"
+echo "  - MLflow traces, registered prompts, and artifacts"
 echo "  - Grafana runtime data"
 echo
 echo "Your local repository and GHCR images are NOT affected."
