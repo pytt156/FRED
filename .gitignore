@@ -240,3 +240,8 @@ config.local.json
 .DS_Store
 
 *.wav
+# FRED deployment certificates
+azure/certs/
+
+# FRED Pico MQTT credentials
+edge/mqtt_azure_creds.py
