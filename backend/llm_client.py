@@ -1,10 +1,18 @@
 import os
 
+import mlflow
 from dotenv import load_dotenv
 from llm_context import build_llm_input
+from mlflow.openai import autolog
 from openai import OpenAI
 
 load_dotenv()
+
+MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5001")
+
+mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
+mlflow.set_experiment("fred-llm")
+autolog()
 
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "openrouter")
 
@@ -25,6 +33,7 @@ else:
     raise ValueError(f"Unsupported LLM provider: {LLM_PROVIDER}")
 
 
+@mlflow.trace(name="generate_fred_response", span_type="CHAIN")
 def generate_fred_response(
     room_state: list[str],
     fred_state: list[str],
@@ -32,6 +41,22 @@ def generate_fred_response(
     presence_active: bool,
     trigger: str,
 ) -> str:
+
+    span = mlflow.get_current_active_span()
+
+    if span is not None:
+        span.set_attributes(
+            {
+                "llm_provider": LLM_PROVIDER,
+                "model": MODEL,
+                "trigger": trigger,
+                "display_state": display_state,
+                "presence_active": presence_active,
+                "room_state": room_state,
+                "fred_state": fred_state,
+            }
+        )
+
     llm_input = build_llm_input(
         room_state=room_state,
         fred_state=fred_state,
@@ -54,5 +79,8 @@ def generate_fred_response(
 
     if content is None:
         raise ValueError("LLM returned no text content")
+
+    if span is not None:
+        span.set_attribute("response_length", len(content))
 
     return content
