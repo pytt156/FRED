@@ -8,7 +8,10 @@ RUN pip install --no-cache-dir uv
 RUN uv sync --no-dev
 
 COPY backend ./backend
+COPY azure/consumer-entrypoint.sh /app/consumer-entrypoint.sh
+
+RUN chmod +x /app/consumer-entrypoint.sh
 
 ENV PYTHONUNBUFFERED=1
 
-CMD ["uv", "run", "python", "-u", "backend/consumer.py"]
+ENTRYPOINT ["/app/consumer-entrypoint.sh"]
