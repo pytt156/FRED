@@ -37,7 +37,7 @@ SERVER_CSR="${CERT_DIR}/mqtt-server.csr"
 SERVER_CERT="${CERT_DIR}/mqtt-server.crt"
 SERVER_EXT="${CERT_DIR}/mqtt-server.ext"
 
-MLFLOW_YAML="/tmp/fred-mlflow.yaml"
+MLFLOW_YAML="$(mktemp "${TMPDIR:-/tmp}/fred-mlflow.XXXXXX.yaml")"
 
 # ============================================================
 # Cleanup
@@ -409,7 +409,7 @@ az containerapp create \
     --memory 2Gi \
     --min-replicas 1 \
     --max-replicas 1 \
-    --ingress internal \
+    --ingress external \
     --target-port 5000 \
     --transport auto \
     --output none
@@ -423,11 +423,11 @@ MLFLOW_FQDN=$(
 )
 
 if [[ -z "$MLFLOW_FQDN" ]]; then
-    echo "ERROR: Could not determine MLflow internal FQDN."
+    echo "ERROR: Could not determine MLflow public FQDN."
     exit 1
 fi
 
-echo "MLflow internal hostname: $MLFLOW_FQDN"
+echo "MLflow public hostname: $MLFLOW_FQDN"
 
 echo "Configuring MLflow startup command..."
 
@@ -437,37 +437,35 @@ az containerapp show \
     --output yaml \
     > "$MLFLOW_YAML"
 
-MLFLOW_ALLOWED_HOSTS="${MLFLOW_APP},${MLFLOW_FQDN}"
-export MLFLOW_ALLOWED_HOSTS
+MLFLOW_INTERNAL_FQDN="${MLFLOW_APP}.internal.${DEFAULT_DOMAIN}"
+MLFLOW_ALLOWED_HOSTS="${MLFLOW_APP}:5000,${MLFLOW_INTERNAL_FQDN},${MLFLOW_FQDN}"
+MLFLOW_ALLOWED_ORIGIN="https://${MLFLOW_FQDN}"
+export MLFLOW_ALLOWED_HOSTS MLFLOW_ALLOWED_ORIGIN
 
-python3 - "$MLFLOW_YAML" <<'PY'
+python3 - "$MLFLOW_YAML" <<'PYMLFLOW'
 from pathlib import Path
 import os
 import sys
 
 path = Path(sys.argv[1])
 text = path.read_text()
+image_marker = "    - image: ghcr.io/mlflow/mlflow:v3.16.1"
 
-image_marker = "    image: ghcr.io/mlflow/mlflow:v3.16.1"
+if text.count(image_marker) != 1:
+    raise SystemExit("ERROR: Expected exactly one MLflow container image in exported YAML.")
 
-if image_marker not in text:
-    raise SystemExit("ERROR: Could not locate MLflow container in exported YAML.")
-
-command_block = f"""    command:
+command_block = f"""      command:
       - /bin/sh
-    args:
+      args:
       - -c
-      - mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri sqlite:////mlflow/mlflow.db --artifacts-destination /mlflow/artifacts --allowed-hosts "{os.environ['MLFLOW_ALLOWED_HOSTS']}" --workers 1
+      - mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri sqlite:////mlflow/mlflow.db --artifacts-destination /mlflow/artifacts --allowed-hosts \"{os.environ['MLFLOW_ALLOWED_HOSTS']}\" --cors-allowed-origins \"{os.environ['MLFLOW_ALLOWED_ORIGIN']}\" --workers 1
 """
 
-text = text.replace(
-    image_marker,
-    command_block + image_marker,
-    1,
-)
-
+# The exported Azure YAML lists the image first, followed by the other
+# properties of the same container. Insert the command INSIDE that container.
+text = text.replace(image_marker, image_marker + "\n" + command_block.rstrip("\n"), 1)
 path.write_text(text)
-PY
+PYMLFLOW
 
 az containerapp update \
     --name "$MLFLOW_APP" \
@@ -475,9 +473,26 @@ az containerapp update \
     --yaml "$MLFLOW_YAML" \
     --output none
 
-MLFLOW_TRACKING_URI="https://${MLFLOW_FQDN}"
+echo "Waiting for MLflow revision to become ready..."
+MLFLOW_READY=false
+for attempt in $(seq 1 60); do
+    LATEST_REVISION=$(az containerapp show --name "$MLFLOW_APP" --resource-group "$RESOURCE_GROUP" --query properties.latestRevisionName --output tsv)
+    READY_REVISION=$(az containerapp show --name "$MLFLOW_APP" --resource-group "$RESOURCE_GROUP" --query properties.latestReadyRevisionName --output tsv)
+    if [[ -n "$LATEST_REVISION" && "$LATEST_REVISION" == "$READY_REVISION" ]]; then
+        MLFLOW_READY=true
+        break
+    fi
+    sleep 5
+done
+if [[ "$MLFLOW_READY" != true ]]; then
+    echo "ERROR: MLflow revision did not become ready; inspect Azure revision logs."
+    exit 1
+fi
 
-echo "MLflow tracking URI: $MLFLOW_TRACKING_URI"
+MLFLOW_TRACKING_URI="https://${MLFLOW_INTERNAL_FQDN}"
+MLFLOW_PUBLIC_URL="https://${MLFLOW_FQDN}"
+
+echo "MLflow internal tracking URI: $MLFLOW_TRACKING_URI"
 
 # ============================================================
 # Consumer
@@ -547,7 +562,7 @@ echo "MQTT TLS:"
 echo "Enabled"
 echo
 echo "MLflow:"
-echo "${MLFLOW_TRACKING_URI}"
+echo "${MLFLOW_PUBLIC_URL}"
 echo
 echo "Pico CA certificate:"
 echo "${CA_CERT}"

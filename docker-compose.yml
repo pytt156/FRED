@@ -39,6 +39,8 @@ services:
       - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER}
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
 
+      - POSTGRES_HOST=${POSTGRES_HOST}
+      - POSTGRES_PORT=${POSTGRES_PORT}
       - POSTGRES_DB=${POSTGRES_DB}
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
@@ -75,11 +77,14 @@ services:
       - OPENAI_MODEL=${OPENAI_MODEL}
       - OPENAI_TTS_MODEL=${OPENAI_TTS_MODEL}
       - OPENAI_TTS_VOICE=${OPENAI_TTS_VOICE}
+      - MLFLOW_TRACKING_URI=${MLFLOW_TRACKING_URI}
     depends_on:
       mosquitto:
         condition: service_healthy
       timescaledb:
         condition: service_healthy
+      mlflow:
+        condition: service_started
     restart: unless-stopped
   mlflow:
     container_name: fred-mlflow
@@ -99,6 +104,8 @@ services:
       - sqlite:////mlflow/mlflow.db
       - --artifacts-destination
       - /mlflow/artifacts
+      - --allowed-hosts
+      - mlflow:5000,localhost:5001,127.0.0.1:5001
     restart: unless-stopped
 
 volumes:

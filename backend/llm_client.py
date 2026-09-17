@@ -1,4 +1,5 @@
 import os
+import time
 
 import mlflow
 from dotenv import load_dotenv
@@ -10,9 +11,64 @@ load_dotenv()
 
 MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5001")
 
-mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
-mlflow.set_experiment("fred-llm")
-autolog()
+MLFLOW_EXPERIMENT = "fred-llm"
+
+MLFLOW_MAX_RETRIES = 5
+MLFLOW_RETRY_DELAY = 3
+
+
+def initialize_mlflow() -> None:
+    """
+    Initialize MLflow with bounded startup retries.
+
+    MLflow is required for FRED. If initialization fails after
+    all retry attempts, raise an exception so the Consumer exits
+    and the container orchestrator can restart it.
+    """
+
+    mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
+
+    for attempt in range(1, MLFLOW_MAX_RETRIES + 1):
+        try:
+            print(
+                f"Connecting to MLflow "
+                f"(attempt {attempt}/{MLFLOW_MAX_RETRIES})...",
+                flush=True,
+            )
+
+            mlflow.set_experiment(MLFLOW_EXPERIMENT)
+
+            print(
+                f"MLflow connected. "
+                f"Experiment: {MLFLOW_EXPERIMENT}",
+                flush=True,
+            )
+
+            break
+
+        except Exception as exc:
+            print(f"MLflow initialization failed: {exc}",flush=True,)
+
+            if attempt == MLFLOW_MAX_RETRIES:
+                raise RuntimeError(
+                    "MLflow initialization failed after "
+                    f"{MLFLOW_MAX_RETRIES} attempts. "
+                    "Consumer cannot start."
+                ) from exc
+
+            print(
+                f"Retrying MLflow in "
+                f"{MLFLOW_RETRY_DELAY} seconds...",
+                flush=True,
+            )
+
+            time.sleep(MLFLOW_RETRY_DELAY)
+
+    autolog()
+
+
+initialize_mlflow()
+
 
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "openrouter")
 
