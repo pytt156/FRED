@@ -7,9 +7,13 @@ AUDIO_END_TOPIC = "fred/audio/end"
 CHUNK_SIZE = 4096
 
 
-def publish_audio(client, audio_bytes: bytes):
+def publish_audio(
+    client,
+    audio_bytes: bytes,
+    sample_rate: int,
+) -> None:
     metadata = {
-        "sample_rate": 24000,
+        "sample_rate": sample_rate,
         "bits": 16,
         "channels": 1,
         "size": len(audio_bytes),

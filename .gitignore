@@ -245,3 +245,6 @@ azure/certs/
 
 # FRED Pico MQTT credentials
 edge/mqtt_azure_creds.py
+
+# Voice - free version
+backend/voices/*.onnx

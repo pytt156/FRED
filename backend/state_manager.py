@@ -43,8 +43,12 @@ def handle_message(client, topic, data):
 
         print(f"FRED says: {fred_response}")
 
-        audio_bytes = generate_speech(fred_response)
-        publish_audio(client, audio_bytes)
+        audio_bytes, sample_rate = generate_speech(fred_response)
+        publish_audio(
+            client,
+            audio_bytes,
+            sample_rate,
+        )
 
         return
 
@@ -119,8 +123,12 @@ def handle_message(client, topic, data):
         )
 
         print(f"FRED says: {fred_response}")
-        audio_bytes = generate_speech(fred_response)
-        publish_audio(client, audio_bytes)
+        audio_bytes, sample_rate = generate_speech(fred_response)
+        publish_audio(
+            client,
+            audio_bytes,
+            sample_rate,
+        )
 
     if room_state != last_room_state:
         print(f"room state changed: {room_state}")

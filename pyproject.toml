@@ -6,6 +6,7 @@ dependencies = [
     "mlflow>=3.16.1",
     "openai>=3.13.0",
     "paho-mqtt>=2.1.0",
+    "piper-tts>=1.8.0",
     "psycopg[binary]>=3.3.5",
     "python-dotenv>=1.2.3",
 ]
