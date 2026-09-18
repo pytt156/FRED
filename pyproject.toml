@@ -10,6 +10,7 @@ dependencies = [
     "psycopg[binary]>=3.3.5",
     "python-dotenv>=1.2.3",
     "requests>=2.34.2",
+    "scikit-learn>=1.9.1",
 ]
 
 [dependency-groups]
