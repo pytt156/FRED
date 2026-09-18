@@ -25,3 +25,5 @@ edge/
 ```
 
 The exact structure may change as the hardware and implementation are decided.
+
+**Note on Azure mode:** to point the device at an Azure deployment instead of local Docker Compose, set `DEPLOYMENT = "azure"` in `device_config.py` with the current `AZURE_MQTT_HOST` (printed by `azure/deploy.sh` as "MQTT hostname"), copy `mqtt_azure_creds_example.py` to `mqtt_azure_creds.py` and fill in the real credentials, and upload `azure/certs/fred-ca.crt` to the device's filesystem root as `fred-ca.crt`. All three must be present on the device itself, not just in the repo checkout.
