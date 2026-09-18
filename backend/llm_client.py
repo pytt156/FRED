@@ -2,7 +2,6 @@ import os
 import time
 
 import mlflow
-
 from dotenv import load_dotenv
 from llm_context import build_llm_input
 from mlflow.openai import autolog
