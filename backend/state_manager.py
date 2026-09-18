@@ -1,6 +1,7 @@
 from datetime import UTC, datetime
 
 from audio_publisher import publish_audio
+from discord_notifier import send_discord_message
 from fred_state import evaluate_fred_state, get_display_state
 from interaction import should_react
 from llm_client import generate_fred_response
@@ -29,12 +30,30 @@ last_fred_states = None
 last_display_state = None
 
 
+def notify_discord(
+    fred_response: str,
+    room_state: list[str],
+) -> None:
+    abnormal_states = [
+        state for state in room_state if state not in {"HEALTHY", "UNKNOWN"}
+    ]
+
+    discord_message = fred_response
+
+    if abnormal_states:
+        discord_message += f"\n\nStates: {', '.join(abnormal_states)}"
+
+    send_discord_message(discord_message)
+
+
 def handle_message(client, topic, data):
     global last_room_state, last_fred_states, last_display_state
 
     if topic == "fred/interaction/button":
+        room_state = last_room_state or ["UNKNOWN"]
+
         fred_response = generate_fred_response(
-            room_state=last_room_state or ["UNKNOWN"],
+            room_state=room_state,
             fred_state=last_fred_states or [],
             display_state=last_display_state or "UNKNOWN",
             presence_active=True,
@@ -42,6 +61,11 @@ def handle_message(client, topic, data):
         )
 
         print(f"FRED says: {fred_response}")
+
+        notify_discord(
+            fred_response=fred_response,
+            room_state=room_state,
+        )
 
         audio_bytes, sample_rate = generate_speech(fred_response)
         publish_audio(
@@ -70,6 +94,7 @@ def handle_message(client, topic, data):
     elif topic == "fred/network/status":
         latest_network_data["connected"] = data["data"].get("connected")
         latest_network_data["rssi"] = data["data"].get("rssi")
+
         save_telemetry(
             time=datetime.now(UTC),
             device_id="fred-pico-01",
@@ -123,6 +148,12 @@ def handle_message(client, topic, data):
         )
 
         print(f"FRED says: {fred_response}")
+
+        notify_discord(
+            fred_response=fred_response,
+            room_state=room_state,
+        )
+
         audio_bytes, sample_rate = generate_speech(fred_response)
         publish_audio(
             client,
@@ -144,4 +175,8 @@ def handle_message(client, topic, data):
         last_display_state = display_state
 
     if fred_changed or display_changed:
-        publish_fred_state(client, fred_states, display_state)
+        publish_fred_state(
+            client,
+            fred_states,
+            display_state,
+        )
