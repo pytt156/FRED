@@ -31,23 +31,24 @@ def initialize_mlflow() -> None:
     for attempt in range(1, MLFLOW_MAX_RETRIES + 1):
         try:
             print(
-                f"Connecting to MLflow "
-                f"(attempt {attempt}/{MLFLOW_MAX_RETRIES})...",
+                f"Connecting to MLflow (attempt {attempt}/{MLFLOW_MAX_RETRIES})...",
                 flush=True,
             )
 
             mlflow.set_experiment(MLFLOW_EXPERIMENT)
 
             print(
-                f"MLflow connected. "
-                f"Experiment: {MLFLOW_EXPERIMENT}",
+                f"MLflow connected. Experiment: {MLFLOW_EXPERIMENT}",
                 flush=True,
             )
 
             break
 
         except Exception as exc:
-            print(f"MLflow initialization failed: {exc}",flush=True,)
+            print(
+                f"MLflow initialization failed: {exc}",
+                flush=True,
+            )
 
             if attempt == MLFLOW_MAX_RETRIES:
                 raise RuntimeError(
@@ -57,8 +58,7 @@ def initialize_mlflow() -> None:
                 ) from exc
 
             print(
-                f"Retrying MLflow in "
-                f"{MLFLOW_RETRY_DELAY} seconds...",
+                f"Retrying MLflow in {MLFLOW_RETRY_DELAY} seconds...",
                 flush=True,
             )
 
