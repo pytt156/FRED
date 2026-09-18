@@ -9,3 +9,10 @@ dependencies = [
     "psycopg[binary]>=3.3.5",
     "python-dotenv>=1.2.3",
 ]
+
+[dependency-groups]
+dev = ["pytest>=9.1.1", "ruff>=0.16.8"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["backend"]

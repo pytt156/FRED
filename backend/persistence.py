@@ -1,6 +1,7 @@
 import os
-from dotenv import load_dotenv
+
 import psycopg
+from dotenv import load_dotenv
 
 load_dotenv()
 
@@ -13,35 +14,39 @@ DB_PASSWORD = os.getenv("POSTGRES_PASSWORD")
 
 def get_connection():
     return psycopg.connect(
-        host=DB_HOST,
-        port=DB_PORT,
-        dbname=DB_NAME,
-        user=DB_USER,
-        password=DB_PASSWORD 
+        host=DB_HOST, port=DB_PORT, dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD
     )
 
 
 def save_telemetry(
-        time, 
-        device_id, 
-        source, 
-        temperature=None,
-        humidity=None, 
-        light=None, 
-        motion=None, 
-        wifi_connected=None, 
-        rssi=None):
+    time,
+    device_id,
+    source,
+    temperature=None,
+    humidity=None,
+    light=None,
+    motion=None,
+    wifi_connected=None,
+    rssi=None,
+):
     query = """
         INSERT INTO telemetry(
         time, device_id, source, temperature, humidity, light, motion, wifi_connected, rssi)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)"""
 
-    values = (time, device_id, source, temperature, humidity, light, motion, wifi_connected, rssi)
+    values = (
+        time,
+        device_id,
+        source,
+        temperature,
+        humidity,
+        light,
+        motion,
+        wifi_connected,
+        rssi,
+    )
 
-    with get_connection() as connection:
-        with connection.cursor() as cursor:
-            cursor.execute(
-                query, values
-            )
+    with get_connection() as connection, connection.cursor() as cursor:
+        cursor.execute(query, values)
 
     print("Telemetry saved to TimescaleDB")

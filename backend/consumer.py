@@ -3,9 +3,7 @@ import os
 import ssl
 
 import paho.mqtt.client as mqtt
-
 from state_manager import handle_message
-
 
 MQTT_HOST = os.getenv("MQTT_HOST", "localhost")
 MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
@@ -49,7 +47,7 @@ if __name__ == "__main__":
     client.on_message = on_message
 
     client.connect(MQTT_HOST, MQTT_PORT)
-    
+
     client.subscribe("fred/room/metrics")
     client.subscribe("fred/room/light")
     client.subscribe("fred/room/noise")
