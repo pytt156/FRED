@@ -598,6 +598,7 @@ dependencies = [
     { name = "piper-tts" },
     { name = "psycopg", extra = ["binary"] },
     { name = "python-dotenv" },
+    { name = "scikit-learn" },
 ]
 
 [package.dev-dependencies]
@@ -614,6 +615,7 @@ requires-dist = [
     { name = "piper-tts", specifier = ">=1.8.0" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.3.5" },
     { name = "python-dotenv", specifier = ">=1.2.3" },
+    { name = "scikit-learn", specifier = ">=1.9.1" },
 ]
 
 [package.metadata.requires-dev]
