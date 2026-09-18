@@ -611,11 +611,39 @@ else
     )
 fi
 
+CONSUMER_EXISTS=false
+
 if az containerapp show \
     --resource-group "$RESOURCE_GROUP" \
     --name "$CONSUMER_APP" \
     >/dev/null 2>&1; then
 
+    CONSUMER_EXISTS=true
+    CONSUMER_STATE=$(
+        az containerapp show \
+            --name "$CONSUMER_APP" \
+            --resource-group "$RESOURCE_GROUP" \
+            --query properties.provisioningState \
+            --output tsv
+    )
+
+    # A container app whose first revision never provisioned successfully
+    # gets stuck in 'Failed' and rejects normal updates — it has to be
+    # deleted and recreated instead.
+    if [[ "$CONSUMER_STATE" == "Failed" ]]; then
+        echo "$CONSUMER_APP exists but never provisioned successfully (state: Failed) — deleting so it can be recreated..."
+
+        az containerapp delete \
+            --name "$CONSUMER_APP" \
+            --resource-group "$RESOURCE_GROUP" \
+            --yes \
+            --output none
+
+        CONSUMER_EXISTS=false
+    fi
+fi
+
+if [[ "$CONSUMER_EXISTS" == true ]]; then
     echo "$CONSUMER_APP already exists, updating image and configuration..."
 
     az containerapp secret set \
@@ -624,11 +652,15 @@ if az containerapp show \
         --secrets "${CONSUMER_SECRETS[@]}" \
         --output none
 
+    # A mutable ":demo" tag can point at a new image without the declared
+    # template string changing, so Container Apps won't always create a new
+    # revision on its own. Force one explicitly so updates always apply.
     az containerapp update \
         --name "$CONSUMER_APP" \
         --resource-group "$RESOURCE_GROUP" \
         --image "$CONSUMER_IMAGE" \
         --set-env-vars "${CONSUMER_ENV_VARS[@]}" \
+        --revision-suffix "deploy$(date +%s)" \
         --output none
 else
     az containerapp create \
