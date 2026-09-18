@@ -1,6 +1,6 @@
 from sklearn.ensemble import IsolationForest
 
-from .features import observations_to_features
+from .features import observation_to_features, observations_to_features
 from .observation import RoomObservation
 from .result import AnomalyResult
 
@@ -17,4 +17,13 @@ class AnomalyDetector:
         self.model.fit(features)
 
     def predict(self, observation: RoomObservation) -> AnomalyResult:
-        raise NotImplementedError
+        features = observation_to_features(observation)
+        feature_matrix = [features]
+
+        prediction = self.model.predict(feature_matrix)[0]
+        raw_score = self.model.decision_function(feature_matrix)[0]
+
+        is_anomaly = bool(prediction == -1)
+        score = float(-raw_score)
+
+        return AnomalyResult(is_anomaly=is_anomaly, score=score)
