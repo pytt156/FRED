@@ -29,7 +29,6 @@ def test_anomaly_detector_fit():
     ]
 
     detector = AnomalyDetector()
-
     detector.fit(observations)
 
     assert hasattr(detector.model, "estimators_")
@@ -82,10 +81,21 @@ def test_anomaly_detector_ranks_unusual_observation_higher():
     detector.fit(training_data)
 
     normal_observation = RoomObservation(
-        datetime.now(tz=UTC), 22.0, 50.0, 50000, True, -55
+        datetime.now(tz=UTC),
+        22.0,
+        50.0,
+        50000,
+        True,
+        -55,
     )
+
     unusual_observation = RoomObservation(
-        datetime.now(tz=UTC), 29.0, 70.0, 15000, False, -85
+        datetime.now(tz=UTC),
+        29.0,
+        70.0,
+        15000,
+        False,
+        -85,
     )
 
     normal_result = detector.predict(normal_observation)
