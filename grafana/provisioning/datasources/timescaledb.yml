@@ -5,7 +5,7 @@ datasources:
     uid: fred-timescaledb
     type: postgres
     access: proxy
-    url: timescaledb:5432
+    url: ${POSTGRES_HOST}:${POSTGRES_PORT}
 
     user: ${POSTGRES_USER}
 

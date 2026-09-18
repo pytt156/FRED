@@ -1,10 +1,17 @@
 from simple import MQTTClient
 from speaker import start_audio, write_audio_chunk, stop_audio
+from device_config import(
+    DEPLOYMENT,
+    LOCAL_MQTT_HOST,
+    LOCAL_MQTT_PORT,
+    AZURE_MQTT_HOST,
+    AZURE_MQTT_PORT
+)
+
 import json
 import time
+import ssl
 
-BROKER_IP = "172.20.10.4"
-BROKER_PORT = 1883
 CLIENT_ID = "fred-pico-01"
 
 ROOM_METRICS_TOPIC = b"fred/room/metrics"
@@ -22,6 +29,41 @@ client = None
 fred_display_state = "HAPPY"
 audio_receiving = False
 
+def create_mqtt_client():
+    if DEPLOYMENT == "local":
+        print("MQTT deployment: local")
+        print("MQTT broker:", LOCAL_MQTT_HOST, LOCAL_MQTT_PORT)
+
+        return MQTTClient(CLIENT_ID, LOCAL_MQTT_HOST, port=LOCAL_MQTT_PORT)
+
+
+    if DEPLOYMENT == "azure":
+        from mqtt_azure_creds import MQTT_USERNAME, MQTT_PASSWORD
+
+        if not AZURE_MQTT_HOST:
+            raise ValueError("AZURE_MQTT_HOST is not configured in device_config.py")
+
+        if not MQTT_USERNAME or not MQTT_PASSWORD:
+            raise ValueError("Azure MQTT username/password are not configured in mqtt_azure_creds.py")
+
+        print("MQTT deployment: azure")
+        print("MQTT broker:", AZURE_MQTT_HOST, AZURE_MQTT_PORT)
+        print("MQTT TLS: enabled")
+
+        tls_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+        tls_context.verify_mode = ssl.CERT_REQUIRED
+        tls_context.load_verify_locations("fred-ca.crt")
+
+        return MQTTClient(
+            CLIENT_ID,
+            AZURE_MQTT_HOST, 
+            port=AZURE_MQTT_PORT,
+            user=MQTT_USERNAME,
+            password=MQTT_PASSWORD,
+            ssl=tls_context
+        )
+
+    raise ValueError("Invalid DEPLOYMENT in device_config.py: {}".format(DEPLOYMENT))
 
 def on_mqtt_message(topic, message):
     global fred_display_state, audio_receiving
@@ -64,7 +106,7 @@ def connect_mqtt():
     global client
 
     try:
-        client = MQTTClient(CLIENT_ID, BROKER_IP, port=BROKER_PORT)
+        client = create_mqtt_client()
         client.set_callback(on_mqtt_message)
         client.connect()
         client.subscribe(FRED_STATE_TOPIC)
