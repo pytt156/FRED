@@ -140,6 +140,7 @@ def generate_fred_response(
                 "content": llm_input,
             }
         ],
+        timeout=30,
     )
 
     content = response.choices[0].message.content
