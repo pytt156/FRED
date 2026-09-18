@@ -9,10 +9,11 @@ from openai import OpenAI
 
 load_dotenv()
 
-MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5001")
-
+MLFLOW_TRACKING_URI = os.getenv(
+    "MLFLOW_TRACKING_URI",
+    "http://localhost:5001",
+)
 MLFLOW_EXPERIMENT = "fred-llm"
-
 MLFLOW_MAX_RETRIES = 5
 MLFLOW_RETRY_DELAY = 3
 
@@ -25,7 +26,6 @@ def initialize_mlflow() -> None:
     all retry attempts, raise an exception so the Consumer exits
     and the container orchestrator can restart it.
     """
-
     mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
 
     for attempt in range(1, MLFLOW_MAX_RETRIES + 1):
@@ -41,7 +41,6 @@ def initialize_mlflow() -> None:
                 f"MLflow connected. Experiment: {MLFLOW_EXPERIMENT}",
                 flush=True,
             )
-
             break
 
         except Exception as exc:
@@ -70,26 +69,38 @@ def initialize_mlflow() -> None:
 initialize_mlflow()
 
 
-LLM_PROVIDER = os.getenv("LLM_PROVIDER", "openrouter")
+MODEL_MODE = os.getenv("MODEL_MODE", "openai")
 
-if LLM_PROVIDER == "openrouter":
+if MODEL_MODE == "free":
+    LLM_PROVIDER = "openrouter"
+
     client = OpenAI(
         base_url="https://openrouter.ai/api/v1",
         api_key=os.environ["OPENROUTER_API_KEY"],
     )
-    MODEL = os.getenv("OPENROUTER_MODEL", "openrouter/free")
 
-elif LLM_PROVIDER == "openai":
+    MODEL = os.getenv(
+        "OPENROUTER_MODEL",
+        "openrouter/free",
+    )
+
+elif MODEL_MODE == "openai":
+    LLM_PROVIDER = "openai"
+
     client = OpenAI(
         api_key=os.environ["OPENAI_API_KEY"],
     )
+
     MODEL = os.environ["OPENAI_MODEL"]
 
 else:
-    raise ValueError(f"Unsupported LLM provider: {LLM_PROVIDER}")
+    raise ValueError(f"Unsupported MODEL_MODE: {MODEL_MODE}")
 
 
-@mlflow.trace(name="generate_fred_response", span_type="CHAIN")
+@mlflow.trace(
+    name="generate_fred_response",
+    span_type="CHAIN",
+)
 def generate_fred_response(
     room_state: list[str],
     fred_state: list[str],
@@ -97,12 +108,12 @@ def generate_fred_response(
     presence_active: bool,
     trigger: str,
 ) -> str:
-
     span = mlflow.get_current_active_span()
 
     if span is not None:
         span.set_attributes(
             {
+                "model_mode": MODEL_MODE,
                 "llm_provider": LLM_PROVIDER,
                 "model": MODEL,
                 "trigger": trigger,
@@ -137,6 +148,9 @@ def generate_fred_response(
         raise ValueError("LLM returned no text content")
 
     if span is not None:
-        span.set_attribute("response_length", len(content))
+        span.set_attribute(
+            "response_length",
+            len(content),
+        )
 
     return content
