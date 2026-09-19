@@ -48,6 +48,7 @@ cleanup() {
     unset POSTGRES_PASSWORD || true
     unset GRAFANA_PASSWORD || true
     unset OPENAI_API_KEY || true
+    unset OPENROUTER_API_KEY || true
 
     unset MQTT_CA_CERT_B64 || true
     unset MQTT_SERVER_CERT_B64 || true
@@ -108,14 +109,40 @@ echo
 read -r -s -p "Grafana admin password: " GRAFANA_PASSWORD
 echo
 
-read -r -s -p "OpenAI API key: " OPENAI_API_KEY
-echo
-
 if [[ -z "$MQTT_PASSWORD" ||
       -z "$POSTGRES_PASSWORD" ||
-      -z "$GRAFANA_PASSWORD" ||
-      -z "$OPENAI_API_KEY" ]]; then
-    echo "ERROR: passwords/API key cannot be empty."
+      -z "$GRAFANA_PASSWORD" ]]; then
+    echo "ERROR: passwords cannot be empty."
+    exit 1
+fi
+
+echo
+read -r -p "Model mode for the consumer (openai/free) [openai]: " MODEL_MODE
+MODEL_MODE="${MODEL_MODE:-openai}"
+
+if [[ "$MODEL_MODE" == "openai" ]]; then
+    read -r -s -p "OpenAI API key: " OPENAI_API_KEY
+    echo
+
+    if [[ -z "$OPENAI_API_KEY" ]]; then
+        echo "ERROR: OpenAI API key cannot be empty."
+        exit 1
+    fi
+
+elif [[ "$MODEL_MODE" == "free" ]]; then
+    read -r -s -p "OpenRouter API key: " OPENROUTER_API_KEY
+    echo
+
+    if [[ -z "$OPENROUTER_API_KEY" ]]; then
+        echo "ERROR: OpenRouter API key cannot be empty."
+        exit 1
+    fi
+
+    read -r -p "OpenRouter model [openrouter/free]: " OPENROUTER_MODEL
+    OPENROUTER_MODEL="${OPENROUTER_MODEL:-openrouter/free}"
+
+else
+    echo "ERROR: Model mode must be 'openai' or 'free'."
     exit 1
 fi
 
@@ -310,31 +337,40 @@ MQTT_SERVER_KEY_B64=$(
 echo
 echo "Deploying Mosquitto with TLS..."
 
-az containerapp create \
-    --name "$MOSQUITTO_APP" \
+if az containerapp show \
     --resource-group "$RESOURCE_GROUP" \
-    --environment "$ENVIRONMENT" \
-    --image "$MOSQUITTO_IMAGE" \
-    --cpu 0.25 \
-    --memory 0.5Gi \
-    --min-replicas 1 \
-    --max-replicas 1 \
-    --secrets \
-        mqtt-password="$MQTT_PASSWORD" \
-        mqtt-ca-cert-b64="$MQTT_CA_CERT_B64" \
-        mqtt-server-cert-b64="$MQTT_SERVER_CERT_B64" \
-        mqtt-server-key-b64="$MQTT_SERVER_KEY_B64" \
-    --env-vars \
-        MQTT_USERNAME="$MQTT_USERNAME" \
-        MQTT_PASSWORD=secretref:mqtt-password \
-        MQTT_CA_CERT_B64=secretref:mqtt-ca-cert-b64 \
-        MQTT_SERVER_CERT_B64=secretref:mqtt-server-cert-b64 \
-        MQTT_SERVER_KEY_B64=secretref:mqtt-server-key-b64 \
-    --ingress external \
-    --transport tcp \
-    --target-port 8883 \
-    --exposed-port 8883 \
-    --output none
+    --name "$MOSQUITTO_APP" \
+    >/dev/null 2>&1; then
+
+    echo "$MOSQUITTO_APP already exists, skipping creation."
+    echo "(To rotate its TLS cert/credentials, delete it first and re-run this script.)"
+else
+    az containerapp create \
+        --name "$MOSQUITTO_APP" \
+        --resource-group "$RESOURCE_GROUP" \
+        --environment "$ENVIRONMENT" \
+        --image "$MOSQUITTO_IMAGE" \
+        --cpu 0.25 \
+        --memory 0.5Gi \
+        --min-replicas 1 \
+        --max-replicas 1 \
+        --secrets \
+            mqtt-password="$MQTT_PASSWORD" \
+            mqtt-ca-cert-b64="$MQTT_CA_CERT_B64" \
+            mqtt-server-cert-b64="$MQTT_SERVER_CERT_B64" \
+            mqtt-server-key-b64="$MQTT_SERVER_KEY_B64" \
+        --env-vars \
+            MQTT_USERNAME="$MQTT_USERNAME" \
+            MQTT_PASSWORD=secretref:mqtt-password \
+            MQTT_CA_CERT_B64=secretref:mqtt-ca-cert-b64 \
+            MQTT_SERVER_CERT_B64=secretref:mqtt-server-cert-b64 \
+            MQTT_SERVER_KEY_B64=secretref:mqtt-server-key-b64 \
+        --ingress external \
+        --transport tcp \
+        --target-port 8883 \
+        --exposed-port 8883 \
+        --output none
+fi
 
 # ============================================================
 # TimescaleDB
@@ -342,26 +378,34 @@ az containerapp create \
 
 echo "Deploying TimescaleDB..."
 
-az containerapp create \
-    --name "$TIMESCALE_APP" \
+if az containerapp show \
     --resource-group "$RESOURCE_GROUP" \
-    --environment "$ENVIRONMENT" \
-    --image "$TIMESCALE_IMAGE" \
-    --cpu 0.5 \
-    --memory 1Gi \
-    --min-replicas 1 \
-    --max-replicas 1 \
-    --secrets \
-        postgres-password="$POSTGRES_PASSWORD" \
-    --env-vars \
-        POSTGRES_DB=fred \
-        POSTGRES_USER=fred \
-        POSTGRES_PASSWORD=secretref:postgres-password \
-    --ingress internal \
-    --transport tcp \
-    --target-port 5432 \
-    --exposed-port 5432 \
-    --output none
+    --name "$TIMESCALE_APP" \
+    >/dev/null 2>&1; then
+
+    echo "$TIMESCALE_APP already exists, skipping creation."
+else
+    az containerapp create \
+        --name "$TIMESCALE_APP" \
+        --resource-group "$RESOURCE_GROUP" \
+        --environment "$ENVIRONMENT" \
+        --image "$TIMESCALE_IMAGE" \
+        --cpu 0.5 \
+        --memory 1Gi \
+        --min-replicas 1 \
+        --max-replicas 1 \
+        --secrets \
+            postgres-password="$POSTGRES_PASSWORD" \
+        --env-vars \
+            POSTGRES_DB=fred \
+            POSTGRES_USER=fred \
+            POSTGRES_PASSWORD=secretref:postgres-password \
+        --ingress internal \
+        --transport tcp \
+        --target-port 5432 \
+        --exposed-port 5432 \
+        --output none
+fi
 
 # ============================================================
 # Grafana
@@ -369,30 +413,38 @@ az containerapp create \
 
 echo "Deploying Grafana..."
 
-az containerapp create \
-    --name "$GRAFANA_APP" \
+if az containerapp show \
     --resource-group "$RESOURCE_GROUP" \
-    --environment "$ENVIRONMENT" \
-    --image "$GRAFANA_IMAGE" \
-    --cpu 0.25 \
-    --memory 0.5Gi \
-    --min-replicas 1 \
-    --max-replicas 1 \
-    --secrets \
-        postgres-password="$POSTGRES_PASSWORD" \
-        grafana-password="$GRAFANA_PASSWORD" \
-    --env-vars \
-        POSTGRES_HOST="$TIMESCALE_APP" \
-        POSTGRES_PORT=5432 \
-        POSTGRES_DB=fred \
-        POSTGRES_USER=fred \
-        POSTGRES_PASSWORD=secretref:postgres-password \
-        GF_SECURITY_ADMIN_USER=admin \
-        GF_SECURITY_ADMIN_PASSWORD=secretref:grafana-password \
-    --ingress external \
-    --target-port 3000 \
-    --transport auto \
-    --output none
+    --name "$GRAFANA_APP" \
+    >/dev/null 2>&1; then
+
+    echo "$GRAFANA_APP already exists, skipping creation."
+else
+    az containerapp create \
+        --name "$GRAFANA_APP" \
+        --resource-group "$RESOURCE_GROUP" \
+        --environment "$ENVIRONMENT" \
+        --image "$GRAFANA_IMAGE" \
+        --cpu 0.5 \
+        --memory 1Gi \
+        --min-replicas 1 \
+        --max-replicas 1 \
+        --secrets \
+            postgres-password="$POSTGRES_PASSWORD" \
+            grafana-password="$GRAFANA_PASSWORD" \
+        --env-vars \
+            POSTGRES_HOST="$TIMESCALE_APP" \
+            POSTGRES_PORT=5432 \
+            POSTGRES_DB=fred \
+            POSTGRES_USER=fred \
+            POSTGRES_PASSWORD=secretref:postgres-password \
+            GF_SECURITY_ADMIN_USER=admin \
+            GF_SECURITY_ADMIN_PASSWORD=secretref:grafana-password \
+        --ingress external \
+        --target-port 3000 \
+        --transport auto \
+        --output none
+fi
 
 # ============================================================
 # MLflow
@@ -400,49 +452,56 @@ az containerapp create \
 
 echo "Deploying MLflow..."
 
-az containerapp create \
-    --name "$MLFLOW_APP" \
+if az containerapp show \
     --resource-group "$RESOURCE_GROUP" \
-    --environment "$ENVIRONMENT" \
-    --image "$MLFLOW_IMAGE" \
-    --cpu 1 \
-    --memory 2Gi \
-    --min-replicas 1 \
-    --max-replicas 1 \
-    --ingress external \
-    --target-port 5000 \
-    --transport auto \
-    --output none
+    --name "$MLFLOW_APP" \
+    >/dev/null 2>&1; then
 
-MLFLOW_FQDN=$(
+    echo "$MLFLOW_APP already exists, skipping creation."
+else
+    az containerapp create \
+        --name "$MLFLOW_APP" \
+        --resource-group "$RESOURCE_GROUP" \
+        --environment "$ENVIRONMENT" \
+        --image "$MLFLOW_IMAGE" \
+        --cpu 1 \
+        --memory 2Gi \
+        --min-replicas 1 \
+        --max-replicas 1 \
+        --ingress external \
+        --target-port 5000 \
+        --transport auto \
+        --output none
+
+    MLFLOW_FQDN=$(
+        az containerapp show \
+            --name "$MLFLOW_APP" \
+            --resource-group "$RESOURCE_GROUP" \
+            --query properties.configuration.ingress.fqdn \
+            --output tsv
+    )
+
+    if [[ -z "$MLFLOW_FQDN" ]]; then
+        echo "ERROR: Could not determine MLflow public FQDN."
+        exit 1
+    fi
+
+    echo "MLflow public hostname: $MLFLOW_FQDN"
+
+    echo "Configuring MLflow startup command..."
+
     az containerapp show \
         --name "$MLFLOW_APP" \
         --resource-group "$RESOURCE_GROUP" \
-        --query properties.configuration.ingress.fqdn \
-        --output tsv
-)
+        --output yaml \
+        > "$MLFLOW_YAML"
 
-if [[ -z "$MLFLOW_FQDN" ]]; then
-    echo "ERROR: Could not determine MLflow public FQDN."
-    exit 1
-fi
+    MLFLOW_INTERNAL_FQDN="${MLFLOW_APP}.internal.${DEFAULT_DOMAIN}"
+    MLFLOW_ALLOWED_HOSTS="${MLFLOW_APP}:5000,${MLFLOW_INTERNAL_FQDN},${MLFLOW_FQDN}"
+    MLFLOW_ALLOWED_ORIGIN="https://${MLFLOW_FQDN}"
+    export MLFLOW_ALLOWED_HOSTS MLFLOW_ALLOWED_ORIGIN
 
-echo "MLflow public hostname: $MLFLOW_FQDN"
-
-echo "Configuring MLflow startup command..."
-
-az containerapp show \
-    --name "$MLFLOW_APP" \
-    --resource-group "$RESOURCE_GROUP" \
-    --output yaml \
-    > "$MLFLOW_YAML"
-
-MLFLOW_INTERNAL_FQDN="${MLFLOW_APP}.internal.${DEFAULT_DOMAIN}"
-MLFLOW_ALLOWED_HOSTS="${MLFLOW_APP}:5000,${MLFLOW_INTERNAL_FQDN},${MLFLOW_FQDN}"
-MLFLOW_ALLOWED_ORIGIN="https://${MLFLOW_FQDN}"
-export MLFLOW_ALLOWED_HOSTS MLFLOW_ALLOWED_ORIGIN
-
-python3 - "$MLFLOW_YAML" <<'PYMLFLOW'
+    python3 - "$MLFLOW_YAML" <<'PYMLFLOW'
 from pathlib import Path
 import os
 import sys
@@ -467,28 +526,39 @@ text = text.replace(image_marker, image_marker + "\n" + command_block.rstrip("\n
 path.write_text(text)
 PYMLFLOW
 
-az containerapp update \
-    --name "$MLFLOW_APP" \
-    --resource-group "$RESOURCE_GROUP" \
-    --yaml "$MLFLOW_YAML" \
-    --output none
+    az containerapp update \
+        --name "$MLFLOW_APP" \
+        --resource-group "$RESOURCE_GROUP" \
+        --yaml "$MLFLOW_YAML" \
+        --output none
 
-echo "Waiting for MLflow revision to become ready..."
-MLFLOW_READY=false
-for attempt in $(seq 1 60); do
-    LATEST_REVISION=$(az containerapp show --name "$MLFLOW_APP" --resource-group "$RESOURCE_GROUP" --query properties.latestRevisionName --output tsv)
-    READY_REVISION=$(az containerapp show --name "$MLFLOW_APP" --resource-group "$RESOURCE_GROUP" --query properties.latestReadyRevisionName --output tsv)
-    if [[ -n "$LATEST_REVISION" && "$LATEST_REVISION" == "$READY_REVISION" ]]; then
-        MLFLOW_READY=true
-        break
+    echo "Waiting for MLflow revision to become ready..."
+    MLFLOW_READY=false
+    for attempt in $(seq 1 60); do
+        LATEST_REVISION=$(az containerapp show --name "$MLFLOW_APP" --resource-group "$RESOURCE_GROUP" --query properties.latestRevisionName --output tsv)
+        READY_REVISION=$(az containerapp show --name "$MLFLOW_APP" --resource-group "$RESOURCE_GROUP" --query properties.latestReadyRevisionName --output tsv)
+        if [[ -n "$LATEST_REVISION" && "$LATEST_REVISION" == "$READY_REVISION" ]]; then
+            MLFLOW_READY=true
+            break
+        fi
+        sleep 5
+    done
+    if [[ "$MLFLOW_READY" != true ]]; then
+        echo "ERROR: MLflow revision did not become ready; inspect Azure revision logs."
+        exit 1
     fi
-    sleep 5
-done
-if [[ "$MLFLOW_READY" != true ]]; then
-    echo "ERROR: MLflow revision did not become ready; inspect Azure revision logs."
-    exit 1
 fi
 
+# Resolve MLflow endpoints unconditionally — needed by the Consumer below
+# whether MLflow was just created or already existed.
+MLFLOW_FQDN=$(
+    az containerapp show \
+        --name "$MLFLOW_APP" \
+        --resource-group "$RESOURCE_GROUP" \
+        --query properties.configuration.ingress.fqdn \
+        --output tsv
+)
+MLFLOW_INTERNAL_FQDN="${MLFLOW_APP}.internal.${DEFAULT_DOMAIN}"
 MLFLOW_TRACKING_URI="https://${MLFLOW_INTERNAL_FQDN}"
 MLFLOW_PUBLIC_URL="https://${MLFLOW_FQDN}"
 
@@ -499,41 +569,113 @@ echo "MLflow internal tracking URI: $MLFLOW_TRACKING_URI"
 # ============================================================
 
 echo "Deploying Consumer with MQTT TLS..."
+echo "Model mode: $MODEL_MODE"
 
-az containerapp create \
-    --name "$CONSUMER_APP" \
+CONSUMER_SECRETS=(
+    mqtt-password="$MQTT_PASSWORD"
+    mqtt-ca-cert-b64="$MQTT_CA_CERT_B64"
+    postgres-password="$POSTGRES_PASSWORD"
+)
+
+CONSUMER_ENV_VARS=(
+    MQTT_HOST="$MQTT_HOST"
+    MQTT_PORT=8883
+    MQTT_USERNAME="$MQTT_USERNAME"
+    MQTT_PASSWORD=secretref:mqtt-password
+    MQTT_TLS=true
+    MQTT_CA_CERT=/tmp/fred-ca.crt
+    MQTT_CA_CERT_B64=secretref:mqtt-ca-cert-b64
+    POSTGRES_HOST="$TIMESCALE_APP"
+    POSTGRES_PORT=5432
+    POSTGRES_DB=fred
+    POSTGRES_USER=fred
+    POSTGRES_PASSWORD=secretref:postgres-password
+    MODEL_MODE="$MODEL_MODE"
+    MLFLOW_TRACKING_URI="$MLFLOW_TRACKING_URI"
+)
+
+if [[ "$MODEL_MODE" == "openai" ]]; then
+    CONSUMER_SECRETS+=(openai-api-key="$OPENAI_API_KEY")
+    CONSUMER_ENV_VARS+=(
+        OPENAI_API_KEY=secretref:openai-api-key
+        OPENAI_MODEL=gpt-5.6-luna
+        OPENAI_TTS_MODEL=gpt-4o-mini-tts
+        OPENAI_TTS_VOICE=ash
+    )
+else
+    CONSUMER_SECRETS+=(openrouter-api-key="$OPENROUTER_API_KEY")
+    CONSUMER_ENV_VARS+=(
+        OPENROUTER_API_KEY=secretref:openrouter-api-key
+        OPENROUTER_MODEL="$OPENROUTER_MODEL"
+        PIPER_VOICE_PATH=backend/voices/en_US-hfc_male-medium.onnx
+    )
+fi
+
+CONSUMER_EXISTS=false
+
+if az containerapp show \
     --resource-group "$RESOURCE_GROUP" \
-    --environment "$ENVIRONMENT" \
-    --image "$CONSUMER_IMAGE" \
-    --cpu 0.25 \
-    --memory 0.5Gi \
-    --min-replicas 1 \
-    --max-replicas 1 \
-    --secrets \
-        mqtt-password="$MQTT_PASSWORD" \
-        mqtt-ca-cert-b64="$MQTT_CA_CERT_B64" \
-        postgres-password="$POSTGRES_PASSWORD" \
-        openai-api-key="$OPENAI_API_KEY" \
-    --env-vars \
-        MQTT_HOST="$MQTT_HOST" \
-        MQTT_PORT=8883 \
-        MQTT_USERNAME="$MQTT_USERNAME" \
-        MQTT_PASSWORD=secretref:mqtt-password \
-        MQTT_TLS=true \
-        MQTT_CA_CERT=/tmp/fred-ca.crt \
-        MQTT_CA_CERT_B64=secretref:mqtt-ca-cert-b64 \
-        POSTGRES_HOST="$TIMESCALE_APP" \
-        POSTGRES_PORT=5432 \
-        POSTGRES_DB=fred \
-        POSTGRES_USER=fred \
-        POSTGRES_PASSWORD=secretref:postgres-password \
-        LLM_PROVIDER=openai \
-        OPENAI_API_KEY=secretref:openai-api-key \
-        OPENAI_MODEL=gpt-5.6-luna \
-        OPENAI_TTS_MODEL=gpt-4o-mini-tts \
-        OPENAI_TTS_VOICE=ash \
-        MLFLOW_TRACKING_URI="$MLFLOW_TRACKING_URI" \
-    --output none
+    --name "$CONSUMER_APP" \
+    >/dev/null 2>&1; then
+
+    CONSUMER_EXISTS=true
+    CONSUMER_STATE=$(
+        az containerapp show \
+            --name "$CONSUMER_APP" \
+            --resource-group "$RESOURCE_GROUP" \
+            --query properties.provisioningState \
+            --output tsv
+    )
+
+    # A container app whose first revision never provisioned successfully
+    # gets stuck in 'Failed' and rejects normal updates — it has to be
+    # deleted and recreated instead.
+    if [[ "$CONSUMER_STATE" == "Failed" ]]; then
+        echo "$CONSUMER_APP exists but never provisioned successfully (state: Failed) — deleting so it can be recreated..."
+
+        az containerapp delete \
+            --name "$CONSUMER_APP" \
+            --resource-group "$RESOURCE_GROUP" \
+            --yes \
+            --output none
+
+        CONSUMER_EXISTS=false
+    fi
+fi
+
+if [[ "$CONSUMER_EXISTS" == true ]]; then
+    echo "$CONSUMER_APP already exists, updating image and configuration..."
+
+    az containerapp secret set \
+        --name "$CONSUMER_APP" \
+        --resource-group "$RESOURCE_GROUP" \
+        --secrets "${CONSUMER_SECRETS[@]}" \
+        --output none
+
+    # A mutable ":demo" tag can point at a new image without the declared
+    # template string changing, so Container Apps won't always create a new
+    # revision on its own. Force one explicitly so updates always apply.
+    az containerapp update \
+        --name "$CONSUMER_APP" \
+        --resource-group "$RESOURCE_GROUP" \
+        --image "$CONSUMER_IMAGE" \
+        --set-env-vars "${CONSUMER_ENV_VARS[@]}" \
+        --revision-suffix "deploy$(date +%s)" \
+        --output none
+else
+    az containerapp create \
+        --name "$CONSUMER_APP" \
+        --resource-group "$RESOURCE_GROUP" \
+        --environment "$ENVIRONMENT" \
+        --image "$CONSUMER_IMAGE" \
+        --cpu 0.25 \
+        --memory 0.5Gi \
+        --min-replicas 1 \
+        --max-replicas 1 \
+        --secrets "${CONSUMER_SECRETS[@]}" \
+        --env-vars "${CONSUMER_ENV_VARS[@]}" \
+        --output none
+fi
 
 # ============================================================
 # Output endpoints
@@ -563,6 +705,9 @@ echo "Enabled"
 echo
 echo "MLflow:"
 echo "${MLFLOW_PUBLIC_URL}"
+echo
+echo "Model mode:"
+echo "${MODEL_MODE}"
 echo
 echo "Pico CA certificate:"
 echo "${CA_CERT}"
