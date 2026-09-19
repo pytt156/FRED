@@ -425,8 +425,8 @@ else
         --resource-group "$RESOURCE_GROUP" \
         --environment "$ENVIRONMENT" \
         --image "$GRAFANA_IMAGE" \
-        --cpu 0.25 \
-        --memory 0.5Gi \
+        --cpu 0.5 \
+        --memory 1Gi \
         --min-replicas 1 \
         --max-replicas 1 \
         --secrets \
