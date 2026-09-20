@@ -5,6 +5,9 @@ def evaluate_network_state(
     connected: bool | None = None,
     rssi: int | None = None,
 ) -> list[str]:
+    if connected is None:
+        return ["UNKNOWN"]
+
     if connected is False:
         return ["OFFLINE"]
 

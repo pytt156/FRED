@@ -44,3 +44,10 @@ def test_missing_rssi_is_not_degraded():
     )
 
     assert result == []
+
+
+def test_missing_connection_state_is_unknown():
+    assert evaluate_network_state(
+        connected=None,
+        rssi=None,
+    ) == ["UNKNOWN"]

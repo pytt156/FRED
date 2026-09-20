@@ -15,6 +15,9 @@ def evaluate_room_state(
     light: float | None = None,
     noise: float | None = None,
 ) -> list[str]:
+    if temperature is None or humidity is None or light is None:
+        return ["UNKNOWN"]
+
     conditions = []
 
     if temperature is not None:

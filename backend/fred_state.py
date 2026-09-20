@@ -2,6 +2,9 @@ def evaluate_fred_state(room_conditions: list[str]) -> list[str]:
     if "OFFLINE" in room_conditions:
         return ["DISCONNECTED"]
 
+    if "UNKNOWN" in room_conditions:
+        return ["UNKNOWN"]
+
     states = []
 
     if any(
@@ -24,6 +27,9 @@ def evaluate_fred_state(room_conditions: list[str]) -> list[str]:
 def get_display_state(fred_states: list[str]) -> str:
     if "DISCONNECTED" in fred_states:
         return "DISCONNECTED"
+
+    if "UNKNOWN" in fred_states:
+        return "UNKNOWN"
 
     if "SLEEPY" in fred_states:
         return "SLEEPY"
