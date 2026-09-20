@@ -1,11 +1,13 @@
 from datetime import UTC, datetime
 
+import psycopg
 from audio_publisher import publish_audio
 from discord_notifier import send_discord_message
 from fred_state import evaluate_fred_state, get_display_state
 from interaction import should_react
 from llm_client import generate_fred_response
 from network_state import evaluate_network_state
+from openai import APIError
 from persistence import save_telemetry
 from presence import is_presence_active, update_motion
 from publisher import publish_fred_state, publish_room_state
@@ -52,13 +54,17 @@ def handle_message(client, topic, data):
     if topic == "fred/interaction/button":
         room_state = last_room_state or ["UNKNOWN"]
 
-        fred_response = generate_fred_response(
-            room_state=room_state,
-            fred_state=last_fred_states or [],
-            display_state=last_display_state or "UNKNOWN",
-            presence_active=True,
-            trigger="button",
-        )
+        try:
+            fred_response = generate_fred_response(
+                room_state=room_state,
+                fred_state=last_fred_states or [],
+                display_state=last_display_state or "UNKNOWN",
+                presence_active=True,
+                trigger="button",
+            )
+        except (APIError, ValueError) as exc:
+            print(f"LLM response failed: {exc}")
+            return
 
         print(f"FRED says: {fred_response}")
 
@@ -68,6 +74,7 @@ def handle_message(client, topic, data):
         )
 
         audio_bytes, sample_rate = generate_speech(fred_response)
+
         publish_audio(
             client,
             audio_bytes,
@@ -95,17 +102,20 @@ def handle_message(client, topic, data):
         latest_network_data["connected"] = data["data"].get("connected")
         latest_network_data["rssi"] = data["data"].get("rssi")
 
-        save_telemetry(
-            time=datetime.now(UTC),
-            device_id="fred-pico-01",
-            source=data.get("source", "real"),
-            temperature=latest_room_data["temperature"],
-            humidity=latest_room_data["humidity"],
-            light=latest_room_data["light"],
-            motion=latest_room_data["motion"],
-            wifi_connected=latest_network_data["connected"],
-            rssi=latest_network_data["rssi"],
-        )
+        try:
+            save_telemetry(
+                time=datetime.now(UTC),
+                device_id="fred-pico-01",
+                source=data.get("source", "real"),
+                temperature=latest_room_data["temperature"],
+                humidity=latest_room_data["humidity"],
+                light=latest_room_data["light"],
+                motion=latest_room_data["motion"],
+                wifi_connected=latest_network_data["connected"],
+                rssi=latest_network_data["rssi"],
+            )
+        except psycopg.Error as exc:
+            print(f"Failed to save telemetry: {exc}")
 
     room_conditions = evaluate_room_state(
         temperature=latest_room_data["temperature"],
@@ -132,13 +142,34 @@ def handle_message(client, topic, data):
 
     presence_active = is_presence_active()
 
+    # Publish deterministic state before optional external side effects.
+    if room_state != last_room_state:
+        print(f"room state changed: {room_state}")
+        publish_room_state(client, room_state)
+        last_room_state = room_state
+
+    if fred_changed or display_changed:
+        print(f"fred state changed: {fred_states}, display state: {display_state}")
+
+        publish_fred_state(
+            client,
+            fred_states,
+            display_state,
+        )
+
+        last_fred_states = fred_states
+        last_display_state = display_state
+
     react = should_react(
         presence_active=presence_active,
         state_changed=fred_changed,
         fred_states=fred_states,
     )
 
-    if react:
+    if not react:
+        return
+
+    try:
         fred_response = generate_fred_response(
             room_state=room_state,
             fred_state=fred_states,
@@ -146,37 +177,21 @@ def handle_message(client, topic, data):
             presence_active=presence_active,
             trigger="spontaneous",
         )
+    except (APIError, ValueError) as exc:
+        print(f"LLM response failed: {exc}")
+        return
 
-        print(f"FRED says: {fred_response}")
+    print(f"FRED says: {fred_response}")
 
-        notify_discord(
-            fred_response=fred_response,
-            room_state=room_state,
-        )
+    notify_discord(
+        fred_response=fred_response,
+        room_state=room_state,
+    )
 
-        audio_bytes, sample_rate = generate_speech(fred_response)
-        publish_audio(
-            client,
-            audio_bytes,
-            sample_rate,
-        )
+    audio_bytes, sample_rate = generate_speech(fred_response)
 
-    if room_state != last_room_state:
-        print(f"room state changed: {room_state}")
-        publish_room_state(client, room_state)
-        last_room_state = room_state
-
-    if fred_changed:
-        print(f"fred states changed: {fred_states}")
-        last_fred_states = fred_states
-
-    if display_changed:
-        print(f"display state changed: {display_state}")
-        last_display_state = display_state
-
-    if fred_changed or display_changed:
-        publish_fred_state(
-            client,
-            fred_states,
-            display_state,
-        )
+    publish_audio(
+        client,
+        audio_bytes,
+        sample_rate,
+    )
