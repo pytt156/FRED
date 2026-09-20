@@ -37,3 +37,11 @@ def test_negative_states_show_unhappy():
 
 def test_default_display_is_happy():
     assert get_display_state(["HAPPY"]) == "HAPPY"
+
+
+def test_unknown_room_makes_fred_unknown():
+    assert evaluate_fred_state(["UNKNOWN"]) == ["UNKNOWN"]
+
+
+def test_unknown_fred_state_has_unknown_display():
+    assert get_display_state(["UNKNOWN"]) == "UNKNOWN"
