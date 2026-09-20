@@ -11,7 +11,7 @@ load_dotenv()
 
 MLFLOW_TRACKING_URI = os.getenv(
     "MLFLOW_TRACKING_URI",
-    "http://localhost:5001",
+    "http://localhost:5000",
 )
 MLFLOW_EXPERIMENT = "fred-llm"
 MLFLOW_MAX_RETRIES = 5
