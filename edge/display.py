@@ -88,6 +88,33 @@ def draw_disconnected_face():
     display.show()
 
 
+def draw_question_mark(x, y):
+    # Hook
+    display.line(x, y, x + 6, y, 1)
+    display.line(x + 6, y, x + 8, y + 3, 1)
+    display.line(x + 8, y + 3, x + 5, y + 6, 1)
+    display.line(x + 5, y + 6, x + 5, y + 8, 1)
+
+    # Dot
+    display.fill_rect(x + 3, y + 11, 3, 3, 1)
+
+
+def draw_unknown_face():
+    clear_display()
+
+    # Question mark eyes
+    draw_question_mark(28, 16)
+    draw_question_mark(86, 16)
+
+    # Uncertain, wavy mouth
+    display.line(44, 50, 54, 42, 1)
+    display.line(54, 42, 64, 50, 1)
+    display.line(64, 50, 74, 42, 1)
+    display.line(74, 42, 84, 50, 1)
+
+    display.show()
+
+
 def show_fred_face(face="happy"):
     if face == "happy":
         draw_happy_face()
@@ -100,6 +127,9 @@ def show_fred_face(face="happy"):
 
     elif face == "disconnected":
         draw_disconnected_face()
+
+    elif face == "unknown":
+        draw_unknown_face()
 
     else:
         draw_happy_face()
