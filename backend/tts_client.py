@@ -12,10 +12,11 @@ MODEL_MODE = os.getenv("MODEL_MODE", "openai")
 OPENAI_TTS_MODEL = os.getenv("OPENAI_TTS_MODEL", "gpt-4o-mini-tts")
 OPENAI_TTS_VOICE = os.getenv("OPENAI_TTS_VOICE", "ash")
 
-PIPER_VOICE_PATH = os.getenv(
-    "PIPER_VOICE_PATH",
-    "voices/en_US-lessac-medium.onnx",
-)
+BASE_DIR = Path(__file__).resolve().parent
+
+DEFAULT_PIPER_VOICE_PATH = BASE_DIR / "voices" / "en_US-hfc_male-medium.onnx"
+
+PIPER_VOICE_PATH = Path(os.getenv("PIPER_VOICE_PATH") or DEFAULT_PIPER_VOICE_PATH)
 
 openai_client = None
 piper_voice = None
@@ -44,12 +45,10 @@ def generate_piper_speech(text: str) -> tuple[bytes, int]:
     global piper_voice
 
     if piper_voice is None:
-        voice_path = Path(PIPER_VOICE_PATH)
+        if not PIPER_VOICE_PATH.exists():
+            raise FileNotFoundError(f"Piper voice model not found: {PIPER_VOICE_PATH}")
 
-        if not voice_path.exists():
-            raise FileNotFoundError(f"Piper voice model not found: {voice_path}")
-
-        piper_voice = PiperVoice.load(str(voice_path))
+        piper_voice = PiperVoice.load(str(PIPER_VOICE_PATH))
 
     audio_parts = []
     sample_rate = None
