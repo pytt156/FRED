@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import psycopg
 from audio_publisher import publish_audio
@@ -13,6 +13,14 @@ from presence import is_presence_active, update_motion
 from publisher import publish_fred_state, publish_room_state
 from room_state import evaluate_room_state
 from tts_client import generate_speech
+
+SENSOR_MAX_AGE = timedelta(seconds=60)
+
+latest_room_seen: dict[str, datetime | None] = {
+    "temperature": None,
+    "humidity": None,
+    "light": None,
+}
 
 latest_room_data = {
     "temperature": None,
@@ -87,8 +95,13 @@ def handle_message(client, topic, data):
         latest_room_data["temperature"] = data["data"].get("temperature")
         latest_room_data["humidity"] = data["data"].get("humidity")
 
+        now = datetime.now(UTC)
+        latest_room_seen["temperature"] = now
+        latest_room_seen["humidity"] = now
+
     elif topic == "fred/room/light":
         latest_room_data["light"] = data["data"].get("light")
+        latest_room_seen["light"] = datetime.now(UTC)
 
     elif topic == "fred/room/noise":
         latest_room_data["noise"] = data["data"].get("noise")
@@ -117,10 +130,33 @@ def handle_message(client, topic, data):
         except psycopg.Error as exc:
             print(f"Failed to save telemetry: {exc}")
 
+    now = datetime.now(UTC)
+
+    temperature = (
+        latest_room_data["temperature"]
+        if latest_room_seen["temperature"] is not None
+        and now - latest_room_seen["temperature"] <= SENSOR_MAX_AGE
+        else None
+    )
+
+    humidity = (
+        latest_room_data["humidity"]
+        if latest_room_seen["humidity"] is not None
+        and now - latest_room_seen["humidity"] <= SENSOR_MAX_AGE
+        else None
+    )
+
+    light = (
+        latest_room_data["light"]
+        if latest_room_seen["light"] is not None
+        and now - latest_room_seen["light"] <= SENSOR_MAX_AGE
+        else None
+    )
+
     room_conditions = evaluate_room_state(
-        temperature=latest_room_data["temperature"],
-        humidity=latest_room_data["humidity"],
-        light=latest_room_data["light"],
+        temperature=temperature,
+        humidity=humidity,
+        light=light,
         noise=latest_room_data["noise"],
     )
 
