@@ -54,6 +54,8 @@ cleanup() {
     unset MQTT_SERVER_CERT_B64 || true
     unset MQTT_SERVER_KEY_B64 || true
 
+    unset DISCORD_WEBHOOK_URL || true
+
     rm -f "$MLFLOW_YAML" || true
 }
 
@@ -107,6 +109,9 @@ read -r -s -p "PostgreSQL password: " POSTGRES_PASSWORD
 echo
 
 read -r -s -p "Grafana admin password: " GRAFANA_PASSWORD
+echo
+
+read -r -s -p "Discord webhook URL (optional): " DISCORD_WEBHOOK_URL
 echo
 
 if [[ -z "$MQTT_PASSWORD" ||
@@ -593,6 +598,13 @@ CONSUMER_ENV_VARS=(
     MODEL_MODE="$MODEL_MODE"
     MLFLOW_TRACKING_URI="$MLFLOW_TRACKING_URI"
 )
+
+if [[ -n "${DISCORD_WEBHOOK_URL:-}" ]]; then
+    CONSUMER_SECRETS+=(discord-webhook-url="$DISCORD_WEBHOOK_URL")
+    CONSUMER_ENV_VARS+=(
+        DISCORD_WEBHOOK_URL=secretref:discord-webhook-url
+    )
+fi
 
 if [[ "$MODEL_MODE" == "openai" ]]; then
     CONSUMER_SECRETS+=(openai-api-key="$OPENAI_API_KEY")
