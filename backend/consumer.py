@@ -20,8 +20,16 @@ MQTT_CA_CERT = os.getenv("MQTT_CA_CERT")
 
 
 def on_message(client, userdata, message):
-    payload = message.payload.decode()
-    data = json.loads(payload)
+    try:
+        payload = message.payload.decode()
+        data = json.loads(payload)
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        print(f"Invalid MQTT payload on {message.topic}: {exc}")
+        return
+
+    if not isinstance(data, dict) or not isinstance(data.get("data"), dict):
+        print(f"Invalid MQTT payload structure on {message.topic}")
+        return
 
     handle_message(client, message.topic, data)
 
