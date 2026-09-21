@@ -11,6 +11,7 @@ from openai import APIError
 from persistence import save_telemetry
 from presence import is_presence_active, update_motion
 from publisher import publish_fred_state, publish_room_state
+from requests import RequestException
 from room_state import evaluate_room_state
 from tts_client import generate_speech
 
@@ -76,12 +77,19 @@ def handle_message(client, topic, data):
 
         print(f"FRED says: {fred_response}")
 
-        notify_discord(
-            fred_response=fred_response,
-            room_state=room_state,
-        )
+        try:
+            notify_discord(
+                fred_response=fred_response,
+                room_state=room_state,
+            )
+        except RequestException as exc:
+            print(f"Discord notification failed: {exc}")
 
-        audio_bytes, sample_rate = generate_speech(fred_response)
+        try:
+            audio_bytes, sample_rate = generate_speech(fred_response)
+        except (APIError, FileNotFoundError, RuntimeError) as exc:
+            print(f"TTS failed: {exc}")
+            return
 
         publish_audio(
             client,
@@ -219,12 +227,19 @@ def handle_message(client, topic, data):
 
     print(f"FRED says: {fred_response}")
 
-    notify_discord(
-        fred_response=fred_response,
-        room_state=room_state,
-    )
+    try:
+        notify_discord(
+            fred_response=fred_response,
+            room_state=room_state,
+        )
+    except RequestException as exc:
+        print(f"Discord notification failed: {exc}")
 
-    audio_bytes, sample_rate = generate_speech(fred_response)
+    try:
+        audio_bytes, sample_rate = generate_speech(fred_response)
+    except (APIError, FileNotFoundError, RuntimeError) as exc:
+        print(f"TTS failed: {exc}")
+        return
 
     publish_audio(
         client,

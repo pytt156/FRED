@@ -7,6 +7,7 @@ from unittest.mock import Mock
 
 import psycopg
 import pytest
+from requests import RequestException
 
 
 class FakeLLMClient(ModuleType):
@@ -284,3 +285,105 @@ def test_optional_signal_does_not_block_room_state(monkeypatch):
     published_state = publish_room_state.call_args.args[1]
 
     assert published_state == ["HEALTHY"]
+
+
+def test_discord_failure_does_not_stop_tts(monkeypatch):
+    client = Mock()
+
+    set_fresh_required_signals()
+
+    monkeypatch.setattr(
+        state_manager,
+        "should_react",
+        Mock(return_value=True),
+    )
+    monkeypatch.setattr(
+        state_manager,
+        "generate_fred_response",
+        Mock(return_value="Hello from FRED"),
+    )
+    monkeypatch.setattr(
+        state_manager,
+        "notify_discord",
+        Mock(side_effect=RequestException("discord unavailable")),
+    )
+
+    generate_speech = Mock(return_value=(b"audio", 24000))
+    publish_audio = Mock()
+
+    monkeypatch.setattr(
+        state_manager,
+        "generate_speech",
+        generate_speech,
+    )
+    monkeypatch.setattr(
+        state_manager,
+        "publish_audio",
+        publish_audio,
+    )
+
+    state_manager.handle_message(
+        client,
+        "fred/room/noise",
+        {
+            "source": "test",
+            "data": {
+                "noise": 30,
+            },
+        },
+    )
+
+    generate_speech.assert_called_once_with("Hello from FRED")
+    publish_audio.assert_called_once_with(
+        client,
+        b"audio",
+        24000,
+    )
+
+
+def test_tts_failure_does_not_escape_handle_message(monkeypatch):
+    client = Mock()
+
+    set_fresh_required_signals()
+
+    monkeypatch.setattr(
+        state_manager,
+        "should_react",
+        Mock(return_value=True),
+    )
+    monkeypatch.setattr(
+        state_manager,
+        "generate_fred_response",
+        Mock(return_value="Hello from FRED"),
+    )
+    monkeypatch.setattr(
+        state_manager,
+        "notify_discord",
+        Mock(),
+    )
+    monkeypatch.setattr(
+        state_manager,
+        "generate_speech",
+        Mock(side_effect=RuntimeError("tts unavailable")),
+    )
+
+    publish_audio = Mock()
+
+    monkeypatch.setattr(
+        state_manager,
+        "publish_audio",
+        publish_audio,
+    )
+
+    state_manager.handle_message(
+        client,
+        "fred/room/noise",
+        {
+            "source": "test",
+            "data": {
+                "noise": 30,
+            },
+        },
+    )
+
+    publish_audio.assert_not_called()
