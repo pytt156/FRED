@@ -52,6 +52,55 @@ def reset_state_manager():
     state_manager.last_display_state = None
 
 
+def mock_state_publication(monkeypatch):
+    publish_room_state = Mock()
+
+    monkeypatch.setattr(
+        state_manager,
+        "publish_room_state",
+        publish_room_state,
+    )
+    monkeypatch.setattr(
+        state_manager,
+        "publish_fred_state",
+        Mock(),
+    )
+    monkeypatch.setattr(
+        state_manager,
+        "should_react",
+        Mock(return_value=False),
+    )
+    monkeypatch.setattr(
+        state_manager,
+        "evaluate_network_state",
+        Mock(return_value=[]),
+    )
+
+    return publish_room_state
+
+
+def set_fresh_required_signals():
+    state_manager.latest_room_data.update(
+        {
+            "temperature": 22.0,
+            "humidity": 45.0,
+            "light": 40000,
+        }
+    )
+
+    now = state_manager.datetime.now(state_manager.UTC)
+
+    state_manager.latest_room_seen.update(
+        {
+            "temperature": now,
+            "humidity": now,
+            "light": now,
+        }
+    )
+
+    return now
+
+
 def test_db_failure_does_not_stop_state_publication(monkeypatch):
     client = Mock()
 
@@ -60,6 +109,7 @@ def test_db_failure_does_not_stop_state_publication(monkeypatch):
         "save_telemetry",
         Mock(side_effect=psycopg.Error("database unavailable")),
     )
+
     publish_room_state = Mock()
     publish_fred_state = Mock()
 
@@ -147,137 +197,36 @@ def test_llm_failure_does_not_stop_state_publication(monkeypatch):
     publish_fred_state.assert_called_once()
 
 
-def test_stale_temperature_results_in_unknown_room_state(monkeypatch):
+@pytest.mark.parametrize(
+    "stale_signal",
+    [
+        "temperature",
+        "humidity",
+        "light",
+    ],
+)
+def test_stale_required_signal_results_in_unknown_room_state(
+    monkeypatch,
+    stale_signal,
+):
     client = Mock()
+    publish_room_state = mock_state_publication(monkeypatch)
 
-    publish_room_state = Mock()
+    now = set_fresh_required_signals()
 
-    monkeypatch.setattr(state_manager, "publish_room_state", publish_room_state)
-    monkeypatch.setattr(state_manager, "publish_fred_state", Mock())
-    monkeypatch.setattr(
-        state_manager,
-        "should_react",
-        Mock(return_value=False),
-    )
-    monkeypatch.setattr(
-        state_manager,
-        "evaluate_network_state",
-        Mock(return_value=[]),
+    state_manager.latest_room_seen[stale_signal] = (
+        now - state_manager.SENSOR_MAX_AGE - timedelta(seconds=1)
     )
 
-    state_manager.latest_room_data.update(
+    state_manager.handle_message(
+        client,
+        "fred/room/noise",
         {
-            "temperature": 22.0,
-            "humidity": 45.0,
-            "light": 40000,
-        }
-    )
-
-    now = state_manager.datetime.now(state_manager.UTC)
-
-    state_manager.latest_room_seen.update(
-        {
-            "temperature": (now - state_manager.SENSOR_MAX_AGE - timedelta(seconds=1)),
-            "humidity": now,
-            "light": now,
-        }
-    )
-
-    data = {
-        "source": "test",
-        "data": {
-            "noise": 30,
+            "source": "test",
+            "data": {
+                "noise": 30,
+            },
         },
-    }
-
-    state_manager.handle_message(
-        client,
-        "fred/room/noise",
-        data,
-    )
-
-    published_state = publish_room_state.call_args.args[1]
-
-    assert published_state == ["UNKNOWN"]
-
-
-def test_stale_humidity_results_in_unknown_room_state(monkeypatch):
-    client = Mock()
-    publish_room_state = Mock()
-
-    monkeypatch.setattr(state_manager, "publish_room_state", publish_room_state)
-    monkeypatch.setattr(state_manager, "publish_fred_state", Mock())
-    monkeypatch.setattr(state_manager, "should_react", Mock(return_value=False))
-    monkeypatch.setattr(
-        state_manager,
-        "evaluate_network_state",
-        Mock(return_value=[]),
-    )
-
-    state_manager.latest_room_data.update(
-        {
-            "temperature": 22.0,
-            "humidity": 45.0,
-            "light": 40000,
-        }
-    )
-
-    now = state_manager.datetime.now(state_manager.UTC)
-
-    state_manager.latest_room_seen.update(
-        {
-            "temperature": now,
-            "humidity": (now - state_manager.SENSOR_MAX_AGE - timedelta(seconds=1)),
-            "light": now,
-        }
-    )
-
-    state_manager.handle_message(
-        client,
-        "fred/room/noise",
-        {"source": "test", "data": {"noise": 30}},
-    )
-
-    published_state = publish_room_state.call_args.args[1]
-
-    assert published_state == ["UNKNOWN"]
-
-
-def test_stale_light_results_in_unknown_room_state(monkeypatch):
-    client = Mock()
-    publish_room_state = Mock()
-
-    monkeypatch.setattr(state_manager, "publish_room_state", publish_room_state)
-    monkeypatch.setattr(state_manager, "publish_fred_state", Mock())
-    monkeypatch.setattr(state_manager, "should_react", Mock(return_value=False))
-    monkeypatch.setattr(
-        state_manager,
-        "evaluate_network_state",
-        Mock(return_value=[]),
-    )
-
-    state_manager.latest_room_data.update(
-        {
-            "temperature": 22.0,
-            "humidity": 45.0,
-            "light": 40000,
-        }
-    )
-
-    now = state_manager.datetime.now(state_manager.UTC)
-
-    state_manager.latest_room_seen.update(
-        {
-            "temperature": now,
-            "humidity": now,
-            "light": (now - state_manager.SENSOR_MAX_AGE - timedelta(seconds=1)),
-        }
-    )
-
-    state_manager.handle_message(
-        client,
-        "fred/room/noise",
-        {"source": "test", "data": {"noise": 30}},
     )
 
     published_state = publish_room_state.call_args.args[1]
@@ -287,34 +236,9 @@ def test_stale_light_results_in_unknown_room_state(monkeypatch):
 
 def test_fresh_required_signals_keep_normal_room_state(monkeypatch):
     client = Mock()
-    publish_room_state = Mock()
+    publish_room_state = mock_state_publication(monkeypatch)
 
-    monkeypatch.setattr(state_manager, "publish_room_state", publish_room_state)
-    monkeypatch.setattr(state_manager, "publish_fred_state", Mock())
-    monkeypatch.setattr(state_manager, "should_react", Mock(return_value=False))
-    monkeypatch.setattr(
-        state_manager,
-        "evaluate_network_state",
-        Mock(return_value=[]),
-    )
-
-    state_manager.latest_room_data.update(
-        {
-            "temperature": 22.0,
-            "humidity": 45.0,
-            "light": 40000,
-        }
-    )
-
-    now = state_manager.datetime.now(state_manager.UTC)
-
-    state_manager.latest_room_seen.update(
-        {
-            "temperature": now,
-            "humidity": now,
-            "light": now,
-        }
-    )
+    set_fresh_required_signals()
 
     state_manager.handle_message(
         client,
@@ -334,34 +258,16 @@ def test_fresh_required_signals_keep_normal_room_state(monkeypatch):
 
 def test_optional_signal_does_not_block_room_state(monkeypatch):
     client = Mock()
-    publish_room_state = Mock()
+    publish_room_state = mock_state_publication(monkeypatch)
 
-    monkeypatch.setattr(state_manager, "publish_room_state", publish_room_state)
-    monkeypatch.setattr(state_manager, "publish_fred_state", Mock())
-    monkeypatch.setattr(state_manager, "should_react", Mock(return_value=False))
+    set_fresh_required_signals()
+
+    state_manager.latest_room_data["noise"] = None
+
     monkeypatch.setattr(
         state_manager,
-        "evaluate_network_state",
-        Mock(return_value=[]),
-    )
-
-    state_manager.latest_room_data.update(
-        {
-            "temperature": 22.0,
-            "humidity": 45.0,
-            "light": 40000,
-            "noise": None,
-        }
-    )
-
-    now = state_manager.datetime.now(state_manager.UTC)
-
-    state_manager.latest_room_seen.update(
-        {
-            "temperature": now,
-            "humidity": now,
-            "light": now,
-        }
+        "update_motion",
+        Mock(),
     )
 
     state_manager.handle_message(
