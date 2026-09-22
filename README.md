@@ -58,7 +58,7 @@ Incomplete sensor data → UNKNOWN
 
 Telemetry is stored in TimescaleDB and visualized in Grafana.
 
-MLflow is used for tracing the LLM layer, while the core room and FRE
+MLflow is used for tracing the optional LLM layer, while the core room and FRED state logic remains deterministic and independent of the LLM.
 
 FRED can also send personality-driven updates to Discord, providing a lightweight notification channel alongside the physical device.
 
@@ -114,6 +114,16 @@ GitHub Actions provides CI for automated tests and linting, while Azure deployme
 ```bash
 cp .env.example .env
 docker compose up --build
+```
+
+Piper voice models are not included in the repository. Download both the model and config file before using TTS:
+
+```bash id="7d6rm8"
+wget https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/hfc_male/medium/en_US-hfc_male-medium.onnx \
+  -O voices/en_US-hfc_male-medium.onnx
+
+wget https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/hfc_male/medium/en_US-hfc_male-medium.onnx.json \
+  -O voices/en_US-hfc_male-medium.onnx.json
 ```
 
 Run tests:
