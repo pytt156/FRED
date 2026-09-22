@@ -120,10 +120,10 @@ Piper voice models are not included in the repository. Download both the model a
 
 ```bash id="7d6rm8"
 wget https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/hfc_male/medium/en_US-hfc_male-medium.onnx \
-  -O voices/en_US-hfc_male-medium.onnx
+  -O backend/voices/en_US-hfc_male-medium.onnx
 
 wget https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/hfc_male/medium/en_US-hfc_male-medium.onnx.json \
-  -O voices/en_US-hfc_male-medium.onnx.json
+  -O backend/voices/en_US-hfc_male-medium.onnx.json
 ```
 
 Run tests:
